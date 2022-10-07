@@ -1,0 +1,471 @@
+---
+title: "Dissertation_NNPP"
+output: html_document
+date: "2022-10-05"
+---
+
+```{r library, include = FALSE}
+cat("\014")
+rm(list = ls())
+
+library(readr)
+library(tidyverse)
+library(ggplot2)
+library(lme4)
+library(emmeans)
+library(ggpubr)
+library(corrplot)
+library(sjPlot)
+library(lubridate)
+library(likert)
+library(tidylog)
+library(data.table)
+library(vtable)
+library(psych)
+```
+
+```{r load datasets, include = FALSE}
+raw_performance = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/merged_performance_calcuated.csv")
+
+raw_word_utterance_count = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/wordUtteranceCountEveryone.csv")
+
+raw_time = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/experiment_spreadsheet.csv")
+
+raw_survey = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/SelfTalk_Winter2022_NNPP_October 4, 2022_14.04.csv") 
+```
+
+```{r data processing, include=FALSE}
+# change characters to lower case, remove the spaces, and irrelevant strings in character strings, also create long dataset for performance and private speech combination
+processing_performance = raw_performance %>%
+  mutate_if(is.character, tolower) %>% 
+  mutate_if(is.character, gsub, pattern =" ", replace = "") %>%
+  mutate_if(is.character, gsub, pattern ="-table1.csv", replace = "") %>% 
+  mutate_if(is.character, gsub, pattern =".csv", replace = "") %>%
+  mutate(trial = readr::parse_number(L)) %>%
+  mutate(L = gsub("[0-9]", "", L))
+   
+expertise = processing_performance %>% 
+  filter(trial <= 2) %>%
+  group_by(L) %>% 
+  mutate(expertise = mean(merged_performance_calcuated, na.rm = T))
+
+performance_expertise = left_join(
+  processing_performance %>% filter(trial >=3), 
+  expertise %>% select(L, expertise) %>% distinct(), 
+  by = "L")
+
+processing_word_utterance_count = raw_word_utterance_count %>%
+  mutate_if(is.character, tolower) %>% 
+  mutate_if(is.character, gsub, pattern =" ", replace = "") %>% 
+  mutate_if(is.character, gsub, pattern =".csv", replace = "") 
+ 
+  word_count = pivot_longer(processing_word_utterance_count %>% select(L, wordCountTrial3, wordCountTrial4), cols = c("wordCountTrial3", "wordCountTrial4"), names_to ="trial", values_to = "word_count") %>%
+    mutate(trial = dplyr::recode(trial, 
+                                 "wordCountTrial3" = "3", 
+                                 "wordCountTrial4" = "4") )
+
+  utterance_count = pivot_longer(processing_word_utterance_count %>% select(L, utteranceCountTrial3, utteranceCountTrial4), cols = c("utteranceCountTrial3", "utteranceCountTrial4"), names_to ="trial", values_to = "utterance_count") %>%
+    mutate(trial = dplyr::recode(trial, 
+                                    "utteranceCountTrial3" = "3", 
+                                    "utteranceCountTrial4" = "4"))
+
+processing_word_utterance_long = full_join(word_count, utterance_count, by = c("L", "trial")) 
+performance_expertise$trial = as.character(performance_expertise$trial)
+number_60_division = function(x) as.numeric(x)/60 # creating a separate function to work under dplyr to transform time into seconds
+
+processing_time = raw_time %>%
+  select(Participant, Time1, Time2, Time3, Time4) %>%
+  mutate_if(is.character, tolower) %>%
+  mutate_if(is.character, gsub, pattern = " ", replace = "") %>%
+  mutate_at(vars(-Participant), number_60_division) %>%
+  pivot_longer(cols = c("Time1", "Time2", "Time3", "Time4"), names_to = "trial", values_to = "time") %>%
+  mutate(trial = dplyr::recode(trial, "Time1" = "1", "Time2" = "2", "Time3" = "3", "Time4" = "4"))
+
+performance_expertise_talk =  full_join(processing_word_utterance_long, performance_expertise, by = c("trial", "L"))
+
+processing_time$trial = as.numeric(processing_time$trial)
+performance_expertise_talk$trial = as.numeric(performance_expertise_talk$trial)
+names(performance_expertise_talk)[names(performance_expertise_talk)== "L"] = "Participant"
+
+
+outlier_expertise = performance_expertise_talk %>% na.omit %>%
+  select(Participant, expertise) %>%
+  distinct() %>%
+  mutate(sd_expertise = sd(expertise, na.rm = T), 
+         mean_expertise = mean(expertise, na.rm = T), 
+         expertise_min = mean_expertise - 3*sd_expertise, 
+         expertise_max = mean_expertise + 3*sd_expertise) %>%
+  filter(expertise > expertise_max | expertise < expertise_min) %>%
+  select(Participant) %>%
+  distinct()
+# the expertise criteria excluded 1 participant
+
+outlier_performance = performance_expertise_talk %>% na.omit %>%
+  mutate(sd_performance = sd(merged_performance_calcuated, na.rm = T), 
+         mean_performance = mean(merged_performance_calcuated, na.rm = T), 
+         performance_min = mean_performance - 3*sd_performance, 
+         performance_max = mean_performance + 3*sd_performance) %>%
+  filter(merged_performance_calcuated > performance_max | merged_performance_calcuated < performance_min) %>%
+  select(Participant, trial)
+
+#   The performance exclusion criteria excluded 4 trials 
+#    Participant    trial
+#   <chr>          <dbl>
+# 1 elizabethlee       3
+# 2 jeannienguyen      4
+# 3 laradonabedian     3
+# 4 shaolunwu          4
+
+performance_expertise_talk= performance_expertise_talk %>%
+  filter(!Participant %in% outlier_expertise) 
+
+# the for loop below removes the outlier_performance by excluding the pairs of (participant, trial) in the outlier_performance dataset
+for (i in 1:nrow(outlier_performance)) {
+    performance_expertise_talk = performance_expertise_talk %>%
+    filter(!(Participant == outlier_performance[i,] %>% pull(Participant) & trial == outlier_performance[i,] %>% pull(trial)))
+}
+
+performance_expertise_talk_time = full_join(performance_expertise_talk, processing_time %>% filter(trial >=3), by = c("Participant", "trial")) %>%
+  mutate(word_min = word_count/time*60, 
+         utterance_min = utterance_count/time*60)
+
+process_survey = raw_survey %>%
+  filter(!is.na(PID_name)) %>%
+  mutate_at(vars(PID_name), tolower) %>%
+  mutate_at(vars(PID_name), gsub, pattern = " ", replace = "")
+
+not_serious_id = process_survey %>%
+  filter(TakeItSerious_Game_1 == "I did not follow the instructions of the game and instead tried to finish the game as quickly as possible.\n(1)" & TakeItSerious_Survey_1 == "I did not read those questions carefully, and instead, I answered them as quickly as possible.\n(1)") 
+
+## one participant was excluded because they did not the take the game and the question seriously  
+process_survey = process_survey %>%
+  filter(!PID_name %in% not_serious_id) 
+
+only_in_performance = setdiff(performance_expertise$L,process_survey$PID_name)
+#  [1] "anacorrea"                "cesiaharorojas"           "chenlin"                 
+#  [4] "deniznalankivrak"         "josephcasteldeoro"        "madelinesoares"          
+#  [7] "mardinimardini"           "mckennaanello"            "nathanhoaita"            
+# [10] "nicholasfisher"           "stephanievaladezdiosdado" "timothyschneider"        
+# [13] "xiangjie(fiona)liu"       "yifanliu"      
+
+#
+process_survey$PID_name[which(grepl("correa", process_survey$PID_name))] = "anacorrea"
+process_survey$PID_name[which(grepl("rojas", process_survey$PID_name))] = "cesiaharorojas"
+# cannot find chenlin
+process_survey$PID_name[which(grepl("kivrak", process_survey$PID_name))] = "deniznalankivrak"
+process_survey$PID_name[which(grepl("casteldeoro", process_survey$PID_name))] = "josephcasteldeoro"
+process_survey$PID_name[which(grepl("soares", process_survey$PID_name))] = "madelinesoares"
+
+process_survey$PID_name[which(grepl("mardini", process_survey$PID_name))] = "mardinimardini"
+
+process_survey$PID_name[which(grepl("nathanta", process_survey$PID_name))] = "nathanhoaita"
+# cannot find mckennaanello
+
+process_survey$PID_name[which(grepl("fisher", process_survey$PID_name))] = "nicholasfisher"
+
+process_survey$PID_name[which(grepl("stephanie", process_survey$PID_name))] = "stephanievaladezdiosdado"
+
+process_survey$PID_name[which(grepl("xiangjie", process_survey$PID_name))] = "xiangjie(fiona)liu"
+
+process_survey$PID_name[which(grepl("schneider", process_survey$PID_name))] = "timothyschneider"
+
+process_survey$PID_name[which(grepl("yifan,liu", process_survey$PID_name))] = "yifanliu"
+
+only_in_performance = setdiff(performance_expertise$L,process_survey$PID_name)
+
+names(process_survey)[names(process_survey) == "PID_name"] = "Participant"
+
+survey_for_combine = process_survey %>% 
+  select(TakeItSerious_Game_1:Participant)
+
+# From qualitative feedback "I think the study was actually very fun and it helped me learn a new way to recall memories using my hand placements."  "It was a very interesting study and I got a chance to learn a good strategy for memorizing." 
+
+final_participants = performance_expertise_talk %>%
+  filter(!Participant %in% not_serious_id) %>%
+  na.omit %>% 
+  pull(Participant)
+
+sample_size = length(unique(final_participants)) # 108
+
+```
+
+```{r word vs utterance, include=FALSE}
+# thinking about how to connect word with utterance
+subjective_1 = process_survey %>%
+  select(Participant, PS_Lkrt_rati_1_1:language_PS1) %>%
+  mutate(trial = 3)
+
+names(subjective_1) = c("Participant", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS", "Content_naming", "Content_prasing", "Content_criticize", "language", "trial")
+
+subjective_2 = process_survey %>%
+  select(Participant, PS_Lkrt_rati_2_1:language_PS2) %>%
+  mutate(trial = 4)
+
+names(subjective_2) = c("Participant", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS", "Content_naming", "Content_prasing", "Content_criticize", "language", "trial")
+
+subjective = rbind(subjective_1, subjective_2)
+```
+
+```{r construct the final dataset for analysis, include=FALSE}
+performance_expertise_talk_time_survey = left_join(performance_expertise_talk_time, survey_for_combine, by = "Participant") %>%
+  left_join(subjective, by = c("Participant", "trial")) %>%
+  filter(Participant %in% final_participants) 
+
+write_csv(performance_expertise_talk_time_survey, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/NNPP_cleaned_compiled.csv")
+
+cor.test(recoded_full_df %>% pull(word_min), recoded_full_df %>% pull(PS_Lkrt_rati))
+# 	Pearson's product-moment correlation
+# 
+# data:  recoded_full_df %>% pull(word_min) and recoded_full_df %>% pull(PS_Lkrt_rati)
+# t = 5.1057, df = 207, p-value = 7.454e-07
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.2081703 0.4497384
+# sample estimates:
+#       cor 
+# 0.3344365 
+
+cor.test(recoded_full_df %>% pull(word_min), recoded_full_df %>% pull(PS_pcg_rati))
+# 	Pearson's product-moment correlation
+# 
+# data:  recoded_full_df %>% pull(word_min) and recoded_full_df %>% pull(PS_pcg_rati)
+# t = 5.7903, df = 207, p-value = 2.58e-08
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.2503217 0.4845171
+# sample estimates:
+#       cor 
+# 0.3733527 
+
+cor.test(recoded_full_df %>% pull(utterance_min), recoded_full_df %>% pull(PS_Lkrt_rati))
+# 	Pearson's product-moment correlation
+# 
+# data:  recoded_full_df %>% pull(utterance_min) and recoded_full_df %>% pull(PS_Lkrt_rati)
+# t = 6.4816, df = 207, p-value = 6.524e-10
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.2912655 0.5176051
+# sample estimates:
+#       cor 
+# 0.4107439 
+
+cor.test(recoded_full_df %>% pull(utterance_min), recoded_full_df %>% pull(PS_pcg_rati))
+# 	Pearson's product-moment correlation
+# 
+# data:  recoded_full_df %>% pull(utterance_min) and recoded_full_df %>% pull(PS_pcg_rati)
+# t = 6.2372, df = 207, p-value = 2.468e-09
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.2769857 0.5061415
+# sample estimates:
+#       cor 
+# 0.3977485 
+
+cor.test(recoded_full_df %>% pull(utterance_count), recoded_full_df %>% pull(PS_pcg_rati))
+# 	Pearson's product-moment correlation
+# 
+# data:  recoded_full_df %>% pull(utterance_count) and recoded_full_df %>% pull(PS_pcg_rati)
+# t = 7.2934, df = 209, p-value = 6.155e-12
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.3357817 0.5519134
+# sample estimates:
+#      cor 
+# 0.450422 
+cor.test(recoded_full_df %>% pull(word_count), recoded_full_df %>% pull(PS_pcg_rati))
+
+
+correlation_zeroOrder_plot = function(df, original_col_list, renamed_col_list) {
+    # corr.matrix -- correlation table and heatmap
+    corelation_matrix = as.data.frame(df[, original_col_list])
+
+    # corelation_matrix[is.na(corelation_matrix)] <- 0
+    colnames(corelation_matrix) = renamed_col_list
+
+    corelation_matrix_cor <- round(cor(corelation_matrix, use = "pairwise.complete.obs"),
+        3)
+    res1 <- cor.mtest(corelation_matrix_cor, conf.level = 0.95)
+
+    corrplot(corelation_matrix_cor, p.mat = res1$p, method = "color", type = "upper",
+        sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9, tl.cex = 0.5,
+        insig = "label_sig", pch.col = "white")
+
+    # corelation_matrix_plot =
+    # corrplot::corrplot.mixed(corelation_matrix_cor,lower.col =
+    # 'black', number.cex = .7,p.mat = res1$p, upper = 'color',
+    # sig.level = c(.001, .01, .05), pch.cex = .9, tl.cex = 0.5,
+    # insig = 'label_sig', pch.col = 'white')
+}
+
+names(recoded_full_df)
+#  [1] "Participant"                  "trial"                       
+#  [3] "word_count"                   "utterance_count"             
+#  [5] "merged_performance_calcuated" "expertise"                   
+#  [7] "time"                         "word_min"                    
+#  [9] "utterance_min"                "TakeItSerious_Game_1"        
+# [11] "TakeItSerious_Survey_1"       "Age"                         
+# [13] "Gender"                       "Gender_3_TEXT"               
+# [15] "EthnoRacial"                  "ETHNORACIAL_mixed"           
+# [17] "Country_born"                 "Country_growUp"              
+# [19] "AgeToUS"                      "COLLEGE STANDING"            
+# [21] "TRANSFER STUDENT"             "SSS_self"                    
+# [23] "SSS_family"                   "PS_Lkrt_rati"                
+# [25] "PS_Lkt_conf"                  "PS_pcg_rati"                 
+# [27] "PS_talk_pcg_conf"             "comfortable_PS"              
+# [29] "Content_naming"               "Content_prasing"             
+# [31] "Content_criticize"            "language"   
+
+correlation_zeroOrder_plot(
+  df = recoded_full_df, 
+  original_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "merged_performance_calcuated", "expertise", "time", "TakeItSerious_Game_1", "TakeItSerious_Survey_1", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS", "Content_naming","Content_prasing", "Content_criticize"), 
+  renamed_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance", "expertise", "time", "Serious_Game", "Serious_Survey", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable", "naming", "prasing", "criticize")) ## there is no correlation between performance and the extent to which they talk out loud during the game. 
+
+```
+
+```{r xxx, include=FALSE}
+setdiff(processing_word_utterance_long$L, performance_expertise$L)
+#  [1]  "emrysjones"               
+#  [4] "ismaelramos"               "jacquelinemanzano-eugenio" "shonjacobjohn"            
+#  [7] "sophianguyen"              "spencerlin"                "thienvo"                  
+# [10] "wenqianxu"                 "yichizhang"                "yuxie"                    
+# [13] "zixuanzeng"               
+
+setdiff(performance_expertise$L, processing_word_utterance_long$L)
+# [1] "adelynnlefavebailey" "alvinnguyen"         "ashlynsloane"        "bridgetmullings"    
+#  [5] "chenlin"             "cynthiaflores"       "deniznalankivrak"    "divyanshukawankar"  
+#  [9] "gerardocortez"       "gissellematus"       "hojeongkim"          "isabellaramos"      
+# [13] "jasonlee"            "joangreen"           "julienguyen"         "kashikarathore"     
+# [17] "kaylaguzman"         "kaylasadaghiani"     "marcusvanderwatt"    "maryramada"         
+# [21] "maxvroemen"          "natashakanhirun"     "nicholasfisher"      "pawelvijayakumar"   
+# [25] "ricardoaltamirano"   "sharanaravindh"      "tatyanasimmonds"     "timothyliao"        
+# [29] "timothyschneider"    "yeabsiraatnafu"      "yifanliu"            "yunjaehur"          
+# [33] "zareenismail"        "zimuguan"           
+
+
+only_in_survey = setdiff(process_survey$PID_name,performance_expertise$L )
+```
+
+```{r analysis , include=FALSE}
+
+full_model_word = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * word_count + (1|Participant))
+lesion_model_word = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + word_count + (1|Participant))
+
+anova(lesion_model_word, full_model_word)
+
+full_model_utterance = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * utterance_count + (1|Participant))
+lesion_model_utterance = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + utterance_count + (1|Participant))
+
+anova(lesion_model_utterance, full_model_utterance)
+
+plot_model(full_model_utterance, type = "pred", terms = c("utterance_count", "expertise"))
+
+
+full_model_utterance_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * utterance_min + (1|Participant))
+lesion_model_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + utterance_min + (1|Participant))
+
+anova(full_model_utterance_min, lesion_model_min)
+
+full_model_word_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * word_min + (1|Participant))
+lesion_word_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + word_min + (1|Participant))
+
+anova(full_model_word_min, lesion_word_min)
+
+plot_model(full_model_utterance_min, type = "pred", terms = c("utterance_min", "expertise"))
+plot_model(full_model_word_min, type = "pred", terms = c("word_min", "expertise"))
+```
+
+
+```{r SURVEY clean data and recode, include=FALSE}
+recoded_full_df = performance_expertise_talk_time_survey %>%
+  mutate_at(vars(TakeItSerious_Game_1, TakeItSerious_Survey_1, SSS_family, SSS_self),
+            ~dplyr::recode(.,
+                    "(3)" = 3L, 
+                    "(2)" = 2L,
+                    "I did not follow the instructions of the game and instead tried to finish the game as quickly as possible.\n(1)" = 1L, 
+                    "I followed the instructions of the game, and played the game to the best of my ability\n(4)" = 4L, 
+                    "I did not read those questions carefully, and instead, I answered them as quickly as possible.\n(1)" =1L, 
+                    "I read the questions carefully, and answered honestly to the best of my ability\n(4)" = 4L,
+                    "1 (the worst off)"= 1L,
+                    "10 (the best off)" = 10L)) %>%
+  mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize), 
+            ~ as.numeric(.))
+
+write_csv(recoded_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/recoded_full_df.csv")
+
+Likert_scale_viz = function(df, original_col, renamed_col, input_level){
+  df[[original_col]] = factor(df[[original_col]], levels = input_level, ordered = TRUE)
+  names(df)[names(df) == original_col] = renamed_col
+result = data.frame(df[,which(colnames(df) == renamed_col)]) 
+ names(result)= gsub("\\."," ", names(result))
+  plot(likert(result), legend.position = "right")
+}
+
+
+original_col = c("TakeItSerious_Survey_1")
+renamed_col = c("How seriously did you answer the questions after the games")
+df = recoded_full_df
+input_level = c("1", "2", "3", "4" )
+
+Likert_scale_plot = Likert_scale_viz(df, original_col, renamed_col, input_level)
+
+### verbal content questions
+verbal_content  <- recoded_full_df  %>% 
+  select(Content_naming, Content_prasing, Content_criticize) %>%
+  rename("Naming the object that you saw" = Content_naming,
+          "Saying positive things to yourself (e.g. praising yourself)" = Content_prasing,
+          "Saying negative things to yourself (e.g. criticizing yourself)" = Content_criticize) %>%
+  mutate_if(is.character, function(x){factor(x, levels =c("1", "2", "3", "4", "5","6", "7"))}) 
+
+verbal_content = data.frame(verbal_content)
+ names(verbal_content)= gsub("\\."," ", names(verbal_content))
+
+## Not Grouped
+# plot(likert(dh)) # basic not grouped
+Likert_scale_multipleQs = plot(likert(verbal_content), legend.position="right")
+
+### density plots
+# PS_pcg_rati 1 & 2
+density_pcg = ggplot(data = recoded_full_df, aes(x = PS_pcg_rati)) + geom_density() +
+  geom_vline(aes(xintercept = median(recoded_full_df$PS_pcg_rati, na.rm = T)), 
+             linetype = "dashed", size = 0.6, color = "#d8b365") +labs(title = "Density and median of private speech percentage rating", x = "what percentage of the time were you talking out loud to yourself \n(as opposed to being silent inside your head)") + theme_classic()
+```
+
+```{r SURVEY summary might delete later, include=FALSE}
+describe(INSERT PROCESSED DATA) # but it also has categorical data
+summary(INSERT PROCESSED DATA)
+vtable(INSERT PROCESSED DATA)
+```
+
+```{r , include=FALSE}
+tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count, utterance_count, expertise, merged_performance_calcuated, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing, Content_criticize)), 
+                           strata = c("Gender"), 
+                           data = recoded_full_df %>% filter(!Gender == "Non-binary"))
+  #                                         Stratified by Gender
+  #                                          Man           Women         p      test
+  # n                                           54           158                    
+  # word_count (mean (SD))                   62.81 (47.04) 58.34 (41.72)  0.513     
+  # utterance_count (mean (SD))              30.56 (10.63) 27.90 (12.36)  0.160     
+  # expertise (mean (SD))                     6.35 (2.65)   5.44 (2.94)   0.044     
+  # merged_performance_calcuated (mean (SD))  5.89 (3.98)   5.90 (3.68)   0.982     
+  # time (mean (SD))                         62.56 (18.31) 70.88 (29.65)  0.054     
+  # word_min (mean (SD))                     57.88 (31.50) 52.96 (37.10)  0.386     
+  # utterance_min (mean (SD))                30.70 (11.59) 25.87 (11.32)  0.008     
+  # TakeItSerious_Game_1 (mean (SD))          3.85 (0.36)   3.82 (0.44)   0.664     
+  # TakeItSerious_Survey_1 (mean (SD))        3.96 (0.19)   3.96 (0.19)   0.975     
+  # PS_Lkrt_rati (mean (SD))                  5.59 (1.12)   5.32 (1.36)   0.190     
+  # PS_Lkt_conf (mean (SD))                   6.33 (0.97)   6.18 (1.02)   0.327     
+  # PS_pcg_rati (mean (SD))                  76.63 (19.08) 75.18 (22.69)  0.674     
+  # PS_talk_pcg_conf (mean (SD))              6.07 (1.04)   6.05 (0.94)   0.878     
+  # comfortable_PS (mean (SD))                5.50 (1.60)   4.74 (1.76)   0.006     
+  # Content_naming (mean (SD))                6.46 (1.06)   6.11 (1.38)   0.088     
+  # Content_prasing (mean (SD))               1.77 (1.10)   2.56 (1.86)   0.028     
+  # Content_criticize (mean (SD))             2.00 (1.51)   2.03 (1.26)   0.916
+
+print(
+  tableOne,
+  nonnormal = c("word_count","word_min", "utterance_count", "expertise", "time", "merged_performance_calcuated"),
+  showAllLevels = TRUE)
+  
+recoded_full_df$CatTable
+
+```
