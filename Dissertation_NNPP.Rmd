@@ -1,6 +1,8 @@
 ---
 title: "Dissertation_NNPP"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 date: "2022-10-05"
 ---
 
@@ -20,18 +22,19 @@ library(lubridate)
 library(likert)
 library(tidylog)
 library(data.table)
-library(vtable)
 library(psych)
+library(DataExplorer)
+library(SmartEDA)
 ```
 
 ```{r load datasets, include = FALSE}
-raw_performance = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/merged_performance_calcuated.csv")
+raw_performance = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/performance.csv")
 
 raw_word_utterance_count = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/wordUtteranceCountEveryone.csv")
 
 raw_time = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/experiment_spreadsheet.csv")
 
-raw_survey = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/SelfTalk_Winter2022_NNPP_October 4, 2022_14.04.csv") 
+raw_survey = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/SelfTalk_Winter2022_NNPP_October 9, 2022_10.45.csv") 
 ```
 
 ```{r data processing, include=FALSE}
@@ -41,23 +44,26 @@ processing_performance = raw_performance %>%
   mutate_if(is.character, gsub, pattern =" ", replace = "") %>%
   mutate_if(is.character, gsub, pattern ="-table1.csv", replace = "") %>% 
   mutate_if(is.character, gsub, pattern =".csv", replace = "") %>%
+  mutate_if(is.character, gsub, pattern ="-", replace = "") %>%
   mutate(trial = readr::parse_number(L)) %>%
   mutate(L = gsub("[0-9]", "", L))
    
-expertise = processing_performance %>% 
+baseline = processing_performance %>% 
   filter(trial <= 2) %>%
   group_by(L) %>% 
-  mutate(expertise = mean(merged_performance_calcuated, na.rm = T))
+  mutate(baseline = mean(performance, na.rm = T))
 
-performance_expertise = left_join(
+performance_baseline = left_join(
   processing_performance %>% filter(trial >=3), 
-  expertise %>% select(L, expertise) %>% distinct(), 
+  baseline %>% select(L, baseline) %>% distinct(), 
   by = "L")
 
 processing_word_utterance_count = raw_word_utterance_count %>%
   mutate_if(is.character, tolower) %>% 
   mutate_if(is.character, gsub, pattern =" ", replace = "") %>% 
-  mutate_if(is.character, gsub, pattern =".csv", replace = "") 
+  mutate_if(is.character, gsub, pattern =".csv", replace = "") %>%
+  mutate_if(is.character, gsub, pattern ="-", replace = "")
+
  
   word_count = pivot_longer(processing_word_utterance_count %>% select(L, wordCountTrial3, wordCountTrial4), cols = c("wordCountTrial3", "wordCountTrial4"), names_to ="trial", values_to = "word_count") %>%
     mutate(trial = dplyr::recode(trial, 
@@ -70,7 +76,9 @@ processing_word_utterance_count = raw_word_utterance_count %>%
                                     "utteranceCountTrial4" = "4"))
 
 processing_word_utterance_long = full_join(word_count, utterance_count, by = c("L", "trial")) 
-performance_expertise$trial = as.character(performance_expertise$trial)
+
+performance_baseline$trial = as.character(performance_baseline$trial)
+
 number_60_division = function(x) as.numeric(x)/60 # creating a separate function to work under dplyr to transform time into seconds
 
 processing_time = raw_time %>%
@@ -81,31 +89,43 @@ processing_time = raw_time %>%
   pivot_longer(cols = c("Time1", "Time2", "Time3", "Time4"), names_to = "trial", values_to = "time") %>%
   mutate(trial = dplyr::recode(trial, "Time1" = "1", "Time2" = "2", "Time3" = "3", "Time4" = "4"))
 
-performance_expertise_talk =  full_join(processing_word_utterance_long, performance_expertise, by = c("trial", "L"))
+performance_baseline_talk =  full_join(processing_word_utterance_long, performance_baseline, by = c("trial", "L"))
 
+audio_yes_performance_no = setdiff(processing_word_utterance_long$L, performance_baseline$L)
+# character(0)
+
+performance_yes_audio_no = setdiff(performance_baseline$L, processing_word_utterance_long$L)
+# [1] "adelynnlefavebailey"  "alvinnguyen"          "ashlynsloane"         "bridgetmullings"      "britanygutierrezleon"
+#  [6] "chloelin"             "cynthiaflores"        "deniznalankivrak"     "divyanshukawankar"    "gerardocortez"       
+# [11] "gissellematus"        "hojeongkim"           "isabellaramos"        "jasonlee"             "joangreen"           
+# [16] "julienguyen"          "kashikarathore"       "kaylaguzman"          "kaylasadaghiani"      "marcusvanderwatt"    
+# [21] "maryramada"           "maxvroemen"           "natashakanhirun"      "nayelilopezrivera"    "nicholasfisher"      
+# [26] "pawelvijayakumar"     "ricardoaltamirano"    "sharanaravindh"       "tatyanasimmonds"      "timothyliao"         
+# [31] "timothyschneider"     "vanessacoronelzapata" "yeabsiraatnafu"       "yifanliu"             "yunjaehur"           
+# [36] "zareenismail"         "zimuguan"  
 processing_time$trial = as.numeric(processing_time$trial)
-performance_expertise_talk$trial = as.numeric(performance_expertise_talk$trial)
-names(performance_expertise_talk)[names(performance_expertise_talk)== "L"] = "Participant"
+performance_baseline_talk$trial = as.numeric(performance_baseline_talk$trial)
+names(performance_baseline_talk)[names(performance_baseline_talk)== "L"] = "Participant"
 
 
-outlier_expertise = performance_expertise_talk %>% na.omit %>%
-  select(Participant, expertise) %>%
+outlier_baseline = performance_baseline_talk %>% na.omit %>%
+  select(Participant, baseline) %>%
   distinct() %>%
-  mutate(sd_expertise = sd(expertise, na.rm = T), 
-         mean_expertise = mean(expertise, na.rm = T), 
-         expertise_min = mean_expertise - 3*sd_expertise, 
-         expertise_max = mean_expertise + 3*sd_expertise) %>%
-  filter(expertise > expertise_max | expertise < expertise_min) %>%
+  mutate(sd_baseline = sd(baseline, na.rm = T), 
+         mean_baseline = mean(baseline, na.rm = T), 
+         baseline_min = mean_baseline - 3*sd_baseline, 
+         baseline_max = mean_baseline + 3*sd_baseline) %>%
+  filter(baseline > baseline_max | baseline < baseline_min) %>%
   select(Participant) %>%
   distinct()
-# the expertise criteria excluded 1 participant
+# the baseline criteria excluded 1 participant
 
-outlier_performance = performance_expertise_talk %>% na.omit %>%
-  mutate(sd_performance = sd(merged_performance_calcuated, na.rm = T), 
-         mean_performance = mean(merged_performance_calcuated, na.rm = T), 
+outlier_performance = performance_baseline_talk %>% na.omit %>%
+  mutate(sd_performance = sd(performance, na.rm = T), 
+         mean_performance = mean(performance, na.rm = T), 
          performance_min = mean_performance - 3*sd_performance, 
          performance_max = mean_performance + 3*sd_performance) %>%
-  filter(merged_performance_calcuated > performance_max | merged_performance_calcuated < performance_min) %>%
+  filter(performance > performance_max | performance < performance_min) %>%
   select(Participant, trial)
 
 #   The performance exclusion criteria excluded 4 trials 
@@ -116,23 +136,25 @@ outlier_performance = performance_expertise_talk %>% na.omit %>%
 # 3 laradonabedian     3
 # 4 shaolunwu          4
 
-performance_expertise_talk= performance_expertise_talk %>%
-  filter(!Participant %in% outlier_expertise) 
+performance_baseline_talk= performance_baseline_talk %>%
+  filter(!Participant %in% outlier_baseline) 
 
 # the for loop below removes the outlier_performance by excluding the pairs of (participant, trial) in the outlier_performance dataset
 for (i in 1:nrow(outlier_performance)) {
-    performance_expertise_talk = performance_expertise_talk %>%
+    performance_baseline_talk = performance_baseline_talk %>%
     filter(!(Participant == outlier_performance[i,] %>% pull(Participant) & trial == outlier_performance[i,] %>% pull(trial)))
 }
 
-performance_expertise_talk_time = full_join(performance_expertise_talk, processing_time %>% filter(trial >=3), by = c("Participant", "trial")) %>%
+performance_baseline_talk_time = full_join(performance_baseline_talk, processing_time %>% filter(trial >=3), by = c("Participant", "trial")) %>%
   mutate(word_min = word_count/time*60, 
          utterance_min = utterance_count/time*60)
 
 process_survey = raw_survey %>%
   filter(!is.na(PID_name)) %>%
   mutate_at(vars(PID_name), tolower) %>%
-  mutate_at(vars(PID_name), gsub, pattern = " ", replace = "")
+  mutate_at(vars(PID_name), gsub, pattern = " ", replace = "") %>%
+  mutate_at(vars(PID_name), gsub, pattern ="-", replace = "")
+
 
 not_serious_id = process_survey %>%
   filter(TakeItSerious_Game_1 == "I did not follow the instructions of the game and instead tried to finish the game as quickly as possible.\n(1)" & TakeItSerious_Survey_1 == "I did not read those questions carefully, and instead, I answered them as quickly as possible.\n(1)") 
@@ -141,14 +163,14 @@ not_serious_id = process_survey %>%
 process_survey = process_survey %>%
   filter(!PID_name %in% not_serious_id) 
 
-only_in_performance = setdiff(performance_expertise$L,process_survey$PID_name)
-#  [1] "anacorrea"                "cesiaharorojas"           "chenlin"                 
-#  [4] "deniznalankivrak"         "josephcasteldeoro"        "madelinesoares"          
-#  [7] "mardinimardini"           "mckennaanello"            "nathanhoaita"            
-# [10] "nicholasfisher"           "stephanievaladezdiosdado" "timothyschneider"        
-# [13] "xiangjie(fiona)liu"       "yifanliu"      
+performance_yes_survey_no = setdiff(performance_baseline$L,process_survey$PID_name)
+#  [1] "anacorrea"                "britanygutierrezleon"     "cesiaharorojas"           "deniznalankivrak"        
+#  [5] "josephcasteldeoro"        "madelinesoares"           "mardinimardini"           "mckennaanello"           
+#  [9] "nathanhoaita"             "nayelilopezrivera"        "nicholasfisher"           "sophianguyen"            
+# [13] "stephanievaladezdiosdado" "timothyschneider"         "vanessacoronelzapata"     "xiangjie(fiona)liu"      
+# [17] "yifanliu" 
 
-#
+process_survey$PID_name[which(grepl("zen", process_survey$PID_name))] = "zixuanzeng"
 process_survey$PID_name[which(grepl("correa", process_survey$PID_name))] = "anacorrea"
 process_survey$PID_name[which(grepl("rojas", process_survey$PID_name))] = "cesiaharorojas"
 # cannot find chenlin
@@ -171,21 +193,43 @@ process_survey$PID_name[which(grepl("schneider", process_survey$PID_name))] = "t
 
 process_survey$PID_name[which(grepl("yifan,liu", process_survey$PID_name))] = "yifanliu"
 
-only_in_performance = setdiff(performance_expertise$L,process_survey$PID_name)
+process_survey$PID_name[which(grepl("anello", process_survey$PID_name))] = "mckennaanello"
 
+process_survey$PID_name[which(grepl("myname", process_survey$PID_name))] = "sophianguyen"
+process_survey$PID_name[which(grepl("vanessam.coronelzapata", process_survey$PID_name))] = "vanessacoronelzapata"
+
+process_survey$PID_name[which(grepl("nayeli", process_survey$PID_name))] = "nayelilopezrivera"
+process_survey$PID_name[which(grepl("britany", process_survey$PID_name))] = "britanygutierrezleon"
+performance_yes_survey_no= setdiff(performance_baseline$L,process_survey$PID_name)
+# cannot find "chenlin"     
 names(process_survey)[names(process_survey) == "PID_name"] = "Participant"
+
+only_in_survey = setdiff(process_survey$Participant,performance_baseline$L )
+#  [1] "pleasetypeyourfullname(first&last),andmakesureit'saccuratesincewe'llneedittomatchwiththegameresult.\n\n\ntheinformationinthisstudywillbeusedonlyforresearchpurposesandinwaysthatwillnotrevealwhoyouare.yournamewilllaterbereplacedbyarandomlygeneratedidduringthedataanalysisofthestudy"
+#  [2] "{\"importid\":\"qid3_text\"}"                                                                                                                                                                                                                                                           
+#  [3] "jennifercastaneda"                                                                                                                                                                                                                                                                      
+#  [4] "weijouhuang"                                                                                                                                                                                                                                                                            
+#  [5] "honganhnguyen"                                                                                                                                                                                                                                                                          
+#  [6] "diannalopez"                                                                                                                                                                                                                                                                            
+#  [7] "yasminelopez"                                                                                                                                                                                                                                                                           
+#  [8] "benjaminhadler"                                                                                                                                                                                                                                                                         
+#  [9] "natalievarelamares"                                                                                                                                                                                                                                                                     
+# [10] "victoriamoralesvargas"                                                                                                                                                                                                                                                                  
+# [11] "ershuanglu"                                                                                                                                                                                                                                                                             
+# [12] "tianlijiang"                                                                                                                                                                                                                                                                            
+# [13] "jessicaju" 
 
 survey_for_combine = process_survey %>% 
   select(TakeItSerious_Game_1:Participant)
 
 # From qualitative feedback "I think the study was actually very fun and it helped me learn a new way to recall memories using my hand placements."  "It was a very interesting study and I got a chance to learn a good strategy for memorizing." 
 
-final_participants = performance_expertise_talk %>%
+final_participants = performance_baseline_talk %>%
   filter(!Participant %in% not_serious_id) %>%
   na.omit %>% 
   pull(Participant)
 
-sample_size = length(unique(final_participants)) # 108
+sample_size = length(unique(final_participants)) # 118
 
 ```
 
@@ -204,76 +248,104 @@ subjective_2 = process_survey %>%
 names(subjective_2) = c("Participant", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS", "Content_naming", "Content_prasing", "Content_criticize", "language", "trial")
 
 subjective = rbind(subjective_1, subjective_2)
-```
 
-```{r construct the final dataset for analysis, include=FALSE}
-performance_expertise_talk_time_survey = left_join(performance_expertise_talk_time, survey_for_combine, by = "Participant") %>%
+performance_baseline_talk_time_survey = left_join(performance_baseline_talk_time, survey_for_combine, by = "Participant") %>%
   left_join(subjective, by = c("Participant", "trial")) %>%
   filter(Participant %in% final_participants) 
 
-write_csv(performance_expertise_talk_time_survey, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/NNPP_cleaned_compiled.csv")
+write_csv(performance_baseline_talk_time_survey, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/NNPP_cleaned_compiled.csv")
+
+recoded_full_df = performance_baseline_talk_time_survey %>%
+  mutate_at(vars(TakeItSerious_Game_1, TakeItSerious_Survey_1, SSS_family, SSS_self),
+            ~dplyr::recode(.,
+                    "I did not follow the instructions of the game and instead tried to finish the game as quickly as possible.\n1" = "1", 
+                    "I followed the instructions of the game, and played the game to the best of my ability\n4" = "4", 
+                    "I did not read those questions carefully, and instead, I answered them as quickly as possible.\n1" ="1", 
+                    "I read the questions carefully, and answered honestly to the best of my ability\n4" = "4",
+                    "1 (the worst off)"= "1",
+                    "10 (the best off)" = "10", )) %>%
+  mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize), 
+            ~ as.numeric(.))
+
+write_csv(recoded_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/recoded_full_df.csv")
+
+
+```
+
+```{r corrplot function and corrplot, echo=FALSE}
 
 cor.test(recoded_full_df %>% pull(word_min), recoded_full_df %>% pull(PS_Lkrt_rati))
-# 	Pearson's product-moment correlation
+#  	Pearson's product-moment correlation
 # 
 # data:  recoded_full_df %>% pull(word_min) and recoded_full_df %>% pull(PS_Lkrt_rati)
-# t = 5.1057, df = 207, p-value = 7.454e-07
+# t = 5.4251, df = 229, p-value = 1.47e-07
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.2081703 0.4497384
+#  0.2178837 0.4470736
 # sample estimates:
 #       cor 
-# 0.3344365 
+# 0.3374704 
+
 
 cor.test(recoded_full_df %>% pull(word_min), recoded_full_df %>% pull(PS_pcg_rati))
 # 	Pearson's product-moment correlation
 # 
 # data:  recoded_full_df %>% pull(word_min) and recoded_full_df %>% pull(PS_pcg_rati)
-# t = 5.7903, df = 207, p-value = 2.58e-08
+# t = 5.8588, df = 229, p-value = 1.61e-08
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.2503217 0.4845171
+#  0.2433085 0.4683006
 # sample estimates:
 #       cor 
-# 0.3733527 
+# 0.3610472 
 
 cor.test(recoded_full_df %>% pull(utterance_min), recoded_full_df %>% pull(PS_Lkrt_rati))
 # 	Pearson's product-moment correlation
 # 
 # data:  recoded_full_df %>% pull(utterance_min) and recoded_full_df %>% pull(PS_Lkrt_rati)
-# t = 6.4816, df = 207, p-value = 6.524e-10
+# t = 6.7518, df = 229, p-value = 1.188e-10
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.2912655 0.5176051
+#  0.2938318 0.5097253
 # sample estimates:
 #       cor 
-# 0.4107439 
+# 0.4074558  
 
 cor.test(recoded_full_df %>% pull(utterance_min), recoded_full_df %>% pull(PS_pcg_rati))
 # 	Pearson's product-moment correlation
 # 
 # data:  recoded_full_df %>% pull(utterance_min) and recoded_full_df %>% pull(PS_pcg_rati)
-# t = 6.2372, df = 207, p-value = 2.468e-09
+# t = 6.4597, df = 229, p-value = 6.223e-10
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.2769857 0.5061415
+#  0.2775846 0.4965123
 # sample estimates:
 #       cor 
-# 0.3977485 
+# 0.3925955 
+
 
 cor.test(recoded_full_df %>% pull(utterance_count), recoded_full_df %>% pull(PS_pcg_rati))
 # 	Pearson's product-moment correlation
 # 
 # data:  recoded_full_df %>% pull(utterance_count) and recoded_full_df %>% pull(PS_pcg_rati)
-# t = 7.2934, df = 209, p-value = 6.155e-12
+# t = 7.0711, df = 233, p-value = 1.777e-11
 # alternative hypothesis: true correlation is not equal to 0
 # 95 percent confidence interval:
-#  0.3357817 0.5519134
+#  0.3089828 0.5203185
 # sample estimates:
-#      cor 
-# 0.450422 
+#       cor 
+# 0.4203347  
 cor.test(recoded_full_df %>% pull(word_count), recoded_full_df %>% pull(PS_pcg_rati))
-
+# 	Pearson's product-moment correlation
+# 
+# data:  recoded_full_df %>% pull(word_count) and recoded_full_df %>% pull(PS_pcg_rati)
+# t = 4.7345, df = 233, p-value = 3.814e-06
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.1749025 0.4087215
+# sample estimates:
+#       cor 
+# 0.2962441
 
 correlation_zeroOrder_plot = function(df, original_col_list, renamed_col_list) {
     # corr.matrix -- correlation table and heatmap
@@ -287,7 +359,7 @@ correlation_zeroOrder_plot = function(df, original_col_list, renamed_col_list) {
     res1 <- cor.mtest(corelation_matrix_cor, conf.level = 0.95)
 
     corrplot(corelation_matrix_cor, p.mat = res1$p, method = "color", type = "upper",
-        sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9, tl.cex = 0.5,
+        sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9, tl.cex = 0.9,
         insig = "label_sig", pch.col = "white")
 
     # corelation_matrix_plot =
@@ -300,7 +372,7 @@ correlation_zeroOrder_plot = function(df, original_col_list, renamed_col_list) {
 names(recoded_full_df)
 #  [1] "Participant"                  "trial"                       
 #  [3] "word_count"                   "utterance_count"             
-#  [5] "merged_performance_calcuated" "expertise"                   
+#  [5] "performance" "baseline"                   
 #  [7] "time"                         "word_min"                    
 #  [9] "utterance_min"                "TakeItSerious_Game_1"        
 # [11] "TakeItSerious_Survey_1"       "Age"                         
@@ -317,80 +389,36 @@ names(recoded_full_df)
 
 correlation_zeroOrder_plot(
   df = recoded_full_df, 
-  original_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "merged_performance_calcuated", "expertise", "time", "TakeItSerious_Game_1", "TakeItSerious_Survey_1", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS", "Content_naming","Content_prasing", "Content_criticize"), 
-  renamed_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance", "expertise", "time", "Serious_Game", "Serious_Survey", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable", "naming", "prasing", "criticize")) ## there is no correlation between performance and the extent to which they talk out loud during the game. 
+  original_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance", "baseline", "time", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS"), 
+  renamed_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance", "baseline", "time",  "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable")) ## there is no correlation between performance and the extent to which they talk out loud during the game. 
 
 ```
 
 ```{r xxx, include=FALSE}
-setdiff(processing_word_utterance_long$L, performance_expertise$L)
-#  [1]  "emrysjones"               
-#  [4] "ismaelramos"               "jacquelinemanzano-eugenio" "shonjacobjohn"            
-#  [7] "sophianguyen"              "spencerlin"                "thienvo"                  
-# [10] "wenqianxu"                 "yichizhang"                "yuxie"                    
-# [13] "zixuanzeng"               
-
-setdiff(performance_expertise$L, processing_word_utterance_long$L)
-# [1] "adelynnlefavebailey" "alvinnguyen"         "ashlynsloane"        "bridgetmullings"    
-#  [5] "chenlin"             "cynthiaflores"       "deniznalankivrak"    "divyanshukawankar"  
-#  [9] "gerardocortez"       "gissellematus"       "hojeongkim"          "isabellaramos"      
-# [13] "jasonlee"            "joangreen"           "julienguyen"         "kashikarathore"     
-# [17] "kaylaguzman"         "kaylasadaghiani"     "marcusvanderwatt"    "maryramada"         
-# [21] "maxvroemen"          "natashakanhirun"     "nicholasfisher"      "pawelvijayakumar"   
-# [25] "ricardoaltamirano"   "sharanaravindh"      "tatyanasimmonds"     "timothyliao"        
-# [29] "timothyschneider"    "yeabsiraatnafu"      "yifanliu"            "yunjaehur"          
-# [33] "zareenismail"        "zimuguan"           
 
 
-only_in_survey = setdiff(process_survey$PID_name,performance_expertise$L )
+#  [1] "pleasetypeyourfullname(first&last),andmakesureit'saccuratesincewe'llneedittomatchwiththegameresult.\n\n\ntheinformationinthisstudywillbeusedonlyforresearchpurposesandinwaysthatwillnotrevealwhoyouare.yournamewilllaterbereplacedbyarandomlygeneratedidduringthedataanalysisofthestudy"
+#  [2] "{\"importid\":\"qid3_text\"}"                                                                                                                                                                                                                                                           
+#  [3] "jennifercastaneda"                                                                                                                                                                                                                                                                      
+#  [4] "myname"                                                                                                                                                                                                                                                                                 
+#  [5] "nayelilopez"                                                                                                                                                                                                                                                                            
+#  [6] "weijouhuang"                                                                                                                                                                                                                                                                            
+#  [7] "honganhnguyen"                                                                                                                                                                                                                                                                          
+#  [8] "diannalopez"                                                                                                                                                                                                                                                                            
+#  [9] "benjaminhadler"                                                                                                                                                                                                                                                                         
+# [10] "natalievarelamares"                                                                                                                                                                                                                                                                     
+# [11] "victoriamoralesvargas"                                                                                                                                                                                                                                                                  
+# [12] "ershuanglu"                                                                                                                                                                                                                                                                             
+# [13] "chloelin"                                                                                                                                                                                                                                                                               
+# [14] "jacquelinemanzano-eugenio"                                                                                                                                                                                                                                                              
+# [15] "tianlijiang"                                                                                                                                                                                                                                                                            
+# [16] "britanygutierrez"                                                                                                                                                                                                                                                                       
+# [17] "vanessam.coronel-zapata"                                                                                                                                                                                                                                                                
+# [18] "joshuaanello"                                                                                                                                                                                                                                                                           
+# [19] "jessicaju"
 ```
 
-```{r analysis , include=FALSE}
-
-full_model_word = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * word_count + (1|Participant))
-lesion_model_word = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + word_count + (1|Participant))
-
-anova(lesion_model_word, full_model_word)
-
-full_model_utterance = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * utterance_count + (1|Participant))
-lesion_model_utterance = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + utterance_count + (1|Participant))
-
-anova(lesion_model_utterance, full_model_utterance)
-
-plot_model(full_model_utterance, type = "pred", terms = c("utterance_count", "expertise"))
-
-
-full_model_utterance_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * utterance_min + (1|Participant))
-lesion_model_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + utterance_min + (1|Participant))
-
-anova(full_model_utterance_min, lesion_model_min)
-
-full_model_word_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise * word_min + (1|Participant))
-lesion_word_min = lmer(data = performance_expertise_talk_time_survey, merged_performance_calcuated ~ expertise + word_min + (1|Participant))
-
-anova(full_model_word_min, lesion_word_min)
-
-plot_model(full_model_utterance_min, type = "pred", terms = c("utterance_min", "expertise"))
-plot_model(full_model_word_min, type = "pred", terms = c("word_min", "expertise"))
-```
-
-
-```{r SURVEY clean data and recode, include=FALSE}
-recoded_full_df = performance_expertise_talk_time_survey %>%
-  mutate_at(vars(TakeItSerious_Game_1, TakeItSerious_Survey_1, SSS_family, SSS_self),
-            ~dplyr::recode(.,
-                    "(3)" = 3L, 
-                    "(2)" = 2L,
-                    "I did not follow the instructions of the game and instead tried to finish the game as quickly as possible.\n(1)" = 1L, 
-                    "I followed the instructions of the game, and played the game to the best of my ability\n(4)" = 4L, 
-                    "I did not read those questions carefully, and instead, I answered them as quickly as possible.\n(1)" =1L, 
-                    "I read the questions carefully, and answered honestly to the best of my ability\n(4)" = 4L,
-                    "1 (the worst off)"= 1L,
-                    "10 (the best off)" = 10L)) %>%
-  mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize), 
-            ~ as.numeric(.))
-
-write_csv(recoded_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/recoded_full_df.csv")
+```{r SURVEY clean data and recode, echo=FALSE}
 
 Likert_scale_viz = function(df, original_col, renamed_col, input_level){
   df[[original_col]] = factor(df[[original_col]], levels = input_level, ordered = TRUE)
@@ -406,9 +434,12 @@ renamed_col = c("How seriously did you answer the questions after the games")
 df = recoded_full_df
 input_level = c("1", "2", "3", "4" )
 
-Likert_scale_plot = Likert_scale_viz(df, original_col, renamed_col, input_level)
+Likert_scale_plot = (Likert_scale_viz(df, original_col, renamed_col, input_level))
 
 ### verbal content questions
+recoded_full_df$Content_prasing = as.character(recoded_full_df$Content_prasing)
+recoded_full_df$Content_criticize = as.character(recoded_full_df$Content_criticize)
+recoded_full_df$Content_naming = as.character(recoded_full_df$Content_naming)
 verbal_content  <- recoded_full_df  %>% 
   select(Content_naming, Content_prasing, Content_criticize) %>%
   rename("Naming the object that you saw" = Content_naming,
@@ -421,23 +452,23 @@ verbal_content = data.frame(verbal_content)
 
 ## Not Grouped
 # plot(likert(dh)) # basic not grouped
-Likert_scale_multipleQs = plot(likert(verbal_content), legend.position="right")
+Likert_scale_multipleQs = (plot(likert(verbal_content), legend.position="right"))
 
 ### density plots
 # PS_pcg_rati 1 & 2
-density_pcg = ggplot(data = recoded_full_df, aes(x = PS_pcg_rati)) + geom_density() +
+density_pcg = (ggplot(data = recoded_full_df, aes(x = PS_pcg_rati)) + geom_density() +
   geom_vline(aes(xintercept = median(recoded_full_df$PS_pcg_rati, na.rm = T)), 
-             linetype = "dashed", size = 0.6, color = "#d8b365") +labs(title = "Density and median of private speech percentage rating", x = "what percentage of the time were you talking out loud to yourself \n(as opposed to being silent inside your head)") + theme_classic()
+             linetype = "dashed", size = 0.6, color = "#d8b365") +labs(title = "Density and median of private speech percentage rating", x = "what percentage of the time were you talking out loud to yourself \n(as opposed to being silent inside your head)") + theme_classic())
 ```
 
-```{r SURVEY summary might delete later, include=FALSE}
-describe(INSERT PROCESSED DATA) # but it also has categorical data
-summary(INSERT PROCESSED DATA)
-vtable(INSERT PROCESSED DATA)
+```{r SURVEY summary might delete later, echo=FALSE}
+describe(recoded_full_df) # but it also has categorical data
 ```
 
-```{r , include=FALSE}
-tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count, utterance_count, expertise, merged_performance_calcuated, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing, Content_criticize)), 
+```{r EDA, include=FALSE}
+library(tableone)
+
+tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count, utterance_count, baseline, performance, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing, Content_criticize)), 
                            strata = c("Gender"), 
                            data = recoded_full_df %>% filter(!Gender == "Non-binary"))
   #                                         Stratified by Gender
@@ -445,8 +476,8 @@ tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count
   # n                                           54           158                    
   # word_count (mean (SD))                   62.81 (47.04) 58.34 (41.72)  0.513     
   # utterance_count (mean (SD))              30.56 (10.63) 27.90 (12.36)  0.160     
-  # expertise (mean (SD))                     6.35 (2.65)   5.44 (2.94)   0.044     
-  # merged_performance_calcuated (mean (SD))  5.89 (3.98)   5.90 (3.68)   0.982     
+  # baseline (mean (SD))                     6.35 (2.65)   5.44 (2.94)   0.044     
+  # performance (mean (SD))  5.89 (3.98)   5.90 (3.68)   0.982     
   # time (mean (SD))                         62.56 (18.31) 70.88 (29.65)  0.054     
   # word_min (mean (SD))                     57.88 (31.50) 52.96 (37.10)  0.386     
   # utterance_min (mean (SD))                30.70 (11.59) 25.87 (11.32)  0.008     
@@ -463,9 +494,185 @@ tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count
 
 print(
   tableOne,
-  nonnormal = c("word_count","word_min", "utterance_count", "expertise", "time", "merged_performance_calcuated"),
+  nonnormal = c("word_count","word_min", "utterance_count", "baseline", "time", "performance"),
   showAllLevels = TRUE)
-  
-recoded_full_df$CatTable
+
+# library(DataExplorer)
+# 
+# setwd("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data")
+# recoded_full_df %>%
+#     create_report(
+#         output_file = "EFA_NNPP_Report"
+#     )
+# 
+# library(SmartEDA)
+# 
+# ExpCatStat(recoded_full_df %>% filter(!is.na(performance)), Target="performance", Pclass="1", plot=TRUE)
+```
+
+```{r analysis , echo=FALSE}
+
+full_model_word = lmer(data = recoded_full_df, performance ~ baseline * word_count + (1|Participant))
+lesion_model_word = lmer(data = recoded_full_df, performance ~ baseline + word_count + (1|Participant))
+
+tab_model(lesion_model_word,full_model_word, p.val = "kr" )
+
+plot_model(full_model_word, type = "pred", terms = c("word_count", "baseline"))
+
+full_model_word_time = lmer(data = recoded_full_df, performance ~ time * baseline * word_count + (1|Participant))
+tab_model(full_model_word_time, p.val = "kr" )
+
+# Data: performance_baseline_talk_time_survey
+# Models:
+# lesion_model_word: performance ~ baseline + word_count + (1 | Participant)
+# full_model_word: performance ~ baseline * word_count + (1 | Participant)
+#                   npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)
+# lesion_model_word    5 1242.0 1259.3 -616.02   1232.0                     
+# full_model_word      6 1243.7 1264.4 -615.84   1231.7 0.3517  1     0.5531
+
+full_model_utterance = lmer(data = recoded_full_df, performance ~ baseline * utterance_count + (1|Participant))
+lesion_model_utterance = lmer(data = recoded_full_df, performance ~ baseline + utterance_count + (1|Participant))
+tab_model(lesion_model_utterance,full_model_utterance, p.val = "kr" )
+
+# Data: recoded_full_df
+# Models:
+# lesion_model_utterance: performance ~ baseline + utterance_count + (1 | Participant)
+# full_model_utterance: performance ~ baseline * utterance_count + (1 | Participant)
+#                        npar    AIC    BIC  logLik deviance Chisq Df Pr(>Chisq)
+# lesion_model_utterance    5 1244.2 1261.4 -617.08   1234.2                    
+# full_model_utterance      6 1246.2 1266.9 -617.08   1234.2 0.008  1     0.9286
+
+plot_model(full_model_utterance, type = "pred", terms = c("utterance_count", "baseline"))
+
+
+full_model_utterance_min = lmer(data = recoded_full_df, performance ~ baseline * utterance_min + (1|Participant))
+lesion_model_min = lmer(data = recoded_full_df, performance ~ baseline + utterance_min + (1|Participant))
+
+tab_model(lesion_model_min,full_model_utterance_min, p.val = "kr" )
+plot_model(full_model_utterance_min, type = "pred", terms = c("utterance_min", "baseline"))
+
+# Data: performance_baseline_talk_time_survey
+# Models:
+# lesion_model_min: performance ~ baseline + utterance_min + (1 | Participant)
+# full_model_utterance_min: performance ~ baseline * utterance_min + (1 | Participant)
+#                          npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)
+# lesion_model_min            5 1201.5 1218.7 -595.75   1191.5                     
+# full_model_utterance_min    6 1202.3 1222.8 -595.13   1190.3 1.2475  1      0.264
+
+full_model_word_min = lmer(data = recoded_full_df, performance ~ baseline * word_min + (1|Participant))
+lesion_word_min = lmer(data = recoded_full_df, performance ~ baseline + word_min + (1|Participant))
+
+tab_model(lesion_word_min,full_model_word_min, p.val = "kr" )
+# Data: performance_baseline_talk_time_survey
+# Models:
+# lesion_word_min: performance ~ baseline + word_min + (1 | Participant)
+# full_model_word_min: performance ~ baseline * word_min + (1 | Participant)
+#                     npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)
+# lesion_word_min        5 1211.5 1228.7 -600.76   1201.5                     
+# full_model_word_min    6 1213.1 1233.7 -600.56   1201.1 0.4002  1      0.527
+plot_model(full_model_word_min, type = "pred", terms = c("word_min", "baseline"))
+
+### looking at main effect 
+no_word_min = lmer(data = recoded_full_df %>% filter(!is.na(word_min)), performance ~ baseline + (1|Participant))
+lesion_word_min = lmer(data = recoded_full_df %>% filter(!is.na(word_min)), performance ~ baseline + word_min + (1|Participant))
+tab_model(no_word_min, lesion_word_min, p.val = "kr")
+plot_model(lesion_word_min, type = "pred", terms = c("word_min"))
+
+
+no_utterance_min = lmer(data = recoded_full_df %>% filter(!is.na(utterance_min)), performance ~ baseline + (1|Participant))
+lesion_utterance_min = lmer(data = recoded_full_df %>% filter(!is.na(utterance_min)), performance ~ baseline + utterance_min + (1|Participant))
+tab_model(no_utterance_min, lesion_utterance_min, p.val = "kr")
+plot_model(lesion_utterance_min, type = "pred", terms = c("utterance_min"))
+
+
+no_word = lmer(data = recoded_full_df %>% filter(!is.na(word_count)), performance ~ baseline + (1|Participant))
+lesion_word = lmer(data = recoded_full_df %>% filter(!is.na(word_count)), performance ~ baseline + word_count + (1|Participant))
+tab_model(no_word, lesion_word, p.val = "kr")
+
+no_utterance = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count)), performance ~ baseline + (1|Participant))
+lesion_utterance = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count)), performance ~ baseline + utterance_count + (1|Participant))
+
+tab_model(no_utterance, lesion_utterance, p.val = "kr")
+```
+
+```{r comfortableness, echo=FALSE}
+no_comfortableness = lmer(data = recoded_full_df %>% filter(!is.na(comfortable_PS)), performance ~ baseline + (1|Participant))
+comfortableness = lmer(data = recoded_full_df %>% filter(!is.na(comfortable_PS)), performance ~ baseline + comfortable_PS + (1|Participant))
+comfortableness_interaction = lmer(data = recoded_full_df %>% filter(!is.na(comfortable_PS)), performance ~ baseline * comfortable_PS + (1|Participant))
+
+tab_model(comfortableness, comfortableness_interaction, p.val = "kr")
+plot_model(full_model_word_min, type = "pred", terms = c("word_min", "baseline"))
+
+
+utter_rate_comfort = lmer(data = recoded_full_df, performance ~ baseline * utterance_min +comfortable_PS + (1|Participant))
+tab_model(full_model_utterance_min, utter_rate_comfort, p.val = "kr")
+
+word_rate_comfort = lmer(data = recoded_full_df, performance ~ baseline * word_min +comfortable_PS + (1|Participant))
+tab_model(full_model_word_min, word_rate_comfort, p.val = "kr")
+
+word_rate_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + word_min +comfortable_PS + (1|Participant))
+word_rate_plus = lmer(data = recoded_full_df, performance ~ baseline + word_min + (1|Participant))
+tab_model(word_rate_plus, word_rate_comfort_plus, p.val = "kr")
+
+
+utterance_rate_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + utterance_min +comfortable_PS + (1|Participant))
+utterance_rate_plus = lmer(data = recoded_full_df, performance ~ baseline + utterance_min + (1|Participant))
+tab_model(utterance_rate_plus, utterance_rate_comfort_plus, p.val = "kr")
+
+```
+
+```{r subjective, include=FALSE}
+## adding comfortableness
+no_likert = lmer(data = recoded_full_df, performance ~ baseline + (1|Participant))
+lesion_likert = lmer(data = recoded_full_df, performance ~ baseline + PS_Lkrt_rati + (1|Participant))
+interaction_likert = lmer(data = recoded_full_df, performance ~ baseline * PS_Lkrt_rati + (1|Participant))
+
+baseline_likert_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_Lkrt_rati + (1|Participant))
+
+baseline_likert_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_Lkrt_rati + comfortable_PS+ (1|Participant))
+
+
+tab_model(no_likert, lesion_likert, p.val = "kr")
+tab_model(lesion_likert, interaction_likert, p.val = "kr")
+tab_model(baseline_likert_plus, baseline_likert_comfort_plus, p.val = "kr")
+
+### adding for percentage
+## adding comfortableness
+no_pcg = lmer(data = recoded_full_df, performance ~ baseline + (1|Participant))
+lesion_pcg = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + (1|Participant))
+interaction_pcg = lmer(data = recoded_full_df, performance ~ baseline * PS_pcg_rati + (1|Participant))
+baseline_pcg_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + (1|Participant))
+baseline_pcg_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + comfortable_PS+ (1|Participant))
+
+tab_model(no_pcg, lesion_pcg, p.val = "kr")
+tab_model(lesion_pcg, interaction_pcg, p.val = "kr")
+tab_model(baseline_pcg_plus, baseline_pcg_comfort_plus, p.val = "kr")
+
+
+```
+
+```{r subjective and objective, include=FALSE}
+m1 = lmer(data = recoded_full_df, PS_Lkrt_rati ~ utterance_min + word_min + utterance_count + word_count + (1|Participant))
+summary(lm(data = recoded_full_df, PS_Lkrt_rati ~ utterance_min + word_min + utterance_count + word_count), type = "III")
+m2 = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + comfortable_PS+ (1|Participant))
+
+```
+
+```{r baseline and self talk, include=FALSE}
+# are baseline and self talk related - utterance
+m1 = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline ~ time + utterance_count + (1|Participant))
+
+m0 = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline ~ time + (1|Participant))
+
+anova(m1,m0)
+
+# are baseline and self talk related - word
+m1 = lmer(data = recoded_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline ~ time + word_count + (1|Participant))
+
+m0 = lmer(data = recoded_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline ~ time + (1|Participant))
+
+anova(m1,m0)
+
+summary(lm(data = recoded_full_df, baseline ~ time + word_count))
 
 ```
