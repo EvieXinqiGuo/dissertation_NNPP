@@ -24,7 +24,10 @@ library(tidylog)
 library(data.table)
 library(psych)
 library(DataExplorer)
-library(SmartEDA)
+library(SmartEDA)  
+library(tableone)
+library(rmcorr)
+library(DataExplorer)
 ```
 
 ```{r load datasets, include = FALSE}
@@ -38,7 +41,7 @@ raw_survey = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDie
 ```
 
 ```{r data processing, include=FALSE}
-# change characters to lower case, remove the spaces, and irrelevant strings in character strings, also create long dataset for performance and private speech combination
+# change characters to lower case, remove the spaces, and irrelevant strings in character strings, also create long dataset for performance_difference and private speech combination
 processing_performance = raw_performance %>%
   mutate_if(is.character, tolower) %>% 
   mutate_if(is.character, gsub, pattern =" ", replace = "") %>%
@@ -51,11 +54,12 @@ processing_performance = raw_performance %>%
 baseline = processing_performance %>% 
   filter(trial <= 2) %>%
   group_by(L) %>% 
-  mutate(baseline = mean(performance, na.rm = T))
+  mutate(baseline_difference = mean(performance_difference, na.rm = T), 
+         baseline_ratio = mean(performance_ratio, na.rm = T))
 
 performance_baseline = left_join(
   processing_performance %>% filter(trial >=3), 
-  baseline %>% select(L, baseline) %>% distinct(), 
+  baseline %>% select(L, baseline_ratio, baseline_difference) %>% distinct(), 
   by = "L")
 
 processing_word_utterance_count = raw_word_utterance_count %>%
@@ -91,7 +95,7 @@ processing_time = raw_time %>%
 
 performance_baseline_talk =  full_join(processing_word_utterance_long, performance_baseline, by = c("trial", "L"))
 
-audio_yes_performance_no = setdiff(processing_word_utterance_long$L, performance_baseline$L)
+audio_yes_performance_difference_no = setdiff(processing_word_utterance_long$L, performance_baseline$L)
 # character(0)
 
 performance_yes_audio_no = setdiff(performance_baseline$L, processing_word_utterance_long$L)
@@ -109,26 +113,37 @@ names(performance_baseline_talk)[names(performance_baseline_talk)== "L"] = "Part
 
 
 outlier_baseline = performance_baseline_talk %>% na.omit %>%
-  select(Participant, baseline) %>%
+  select(Participant, baseline_ratio, baseline_difference) %>%
   distinct() %>%
-  mutate(sd_baseline = sd(baseline, na.rm = T), 
-         mean_baseline = mean(baseline, na.rm = T), 
-         baseline_min = mean_baseline - 3*sd_baseline, 
-         baseline_max = mean_baseline + 3*sd_baseline) %>%
-  filter(baseline > baseline_max | baseline < baseline_min) %>%
+  mutate(sd_baseline_difference = sd(baseline_difference, na.rm = T), 
+         mean_baseline_difference = mean(baseline_difference, na.rm = T), 
+         baseline_diff_min = mean_baseline_difference - 3*sd_baseline_difference, 
+         baseline_diff_max = mean_baseline_difference + 3*sd_baseline_difference, 
+         sd_baseline_ratio = sd(baseline_difference, na.rm = T), 
+         mean_baseline_ratio = mean(baseline_ratio, na.rm = T), 
+         baseline_ratio_min = mean_baseline_ratio - 3*sd_baseline_ratio, 
+         baseline_ratio_max = mean_baseline_ratio + 3*sd_baseline_ratio) %>%
+  filter(baseline_ratio > baseline_ratio_max | baseline_ratio < baseline_ratio_min | baseline_difference > baseline_diff_max | baseline_difference < baseline_diff_min) %>%
   select(Participant) %>%
   distinct()
-# the baseline criteria excluded 1 participant
+# the baseline criteria excluded 1 participant, the ratio and the difference calculation resulted in the same outlier participant
 
 outlier_performance = performance_baseline_talk %>% na.omit %>%
-  mutate(sd_performance = sd(performance, na.rm = T), 
-         mean_performance = mean(performance, na.rm = T), 
-         performance_min = mean_performance - 3*sd_performance, 
-         performance_max = mean_performance + 3*sd_performance) %>%
-  filter(performance > performance_max | performance < performance_min) %>%
+  mutate(sd_performance_difference = sd(performance_difference, na.rm = T), 
+         mean_performance_difference = mean(performance_difference, na.rm = T), 
+         performance_difference_min = mean_performance_difference - 3*sd_performance_difference, 
+         performance_difference_max = mean_performance_difference + 3*sd_performance_difference, 
+         sd_performance_ratio = sd(performance_ratio, na.rm = T), 
+         mean_performance_ratio = mean(performance_ratio, na.rm = T), 
+         performance_ratio_min = mean_performance_ratio - 3*sd_performance_ratio, 
+         performance_ratio_max = mean_performance_ratio + 3*sd_performance_ratio) %>%
+  filter(performance_difference > performance_difference_max | 
+           performance_difference < performance_difference_min |
+           performance_ratio > performance_ratio_max | 
+           performance_ratio < performance_ratio_min) %>%
   select(Participant, trial)
 
-#   The performance exclusion criteria excluded 4 trials 
+#   The performance_difference exclusion criteria excluded 4 trials, the same trials and participants were excluded based on the performance_ratio criteria. 
 #    Participant    trial
 #   <chr>          <dbl>
 # 1 elizabethlee       3
@@ -139,7 +154,7 @@ outlier_performance = performance_baseline_talk %>% na.omit %>%
 performance_baseline_talk= performance_baseline_talk %>%
   filter(!Participant %in% outlier_baseline) 
 
-# the for loop below removes the outlier_performance by excluding the pairs of (participant, trial) in the outlier_performance dataset
+# the for loop below removes the outlier_performance_difference by excluding the pairs of (participant, trial) in the outlier_performance_difference dataset
 for (i in 1:nrow(outlier_performance)) {
     performance_baseline_talk = performance_baseline_talk %>%
     filter(!(Participant == outlier_performance[i,] %>% pull(Participant) & trial == outlier_performance[i,] %>% pull(trial)))
@@ -264,12 +279,10 @@ recoded_full_df = performance_baseline_talk_time_survey %>%
                     "I read the questions carefully, and answered honestly to the best of my ability\n4" = "4",
                     "1 (the worst off)"= "1",
                     "10 (the best off)" = "10", )) %>%
-  mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize), 
+  mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize, SSS_self, SSS_family), 
             ~ as.numeric(.))
 
 write_csv(recoded_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/recoded_full_df.csv")
-
-
 ```
 
 ```{r corrplot function and corrplot, echo=FALSE}
@@ -372,7 +385,7 @@ correlation_zeroOrder_plot = function(df, original_col_list, renamed_col_list) {
 names(recoded_full_df)
 #  [1] "Participant"                  "trial"                       
 #  [3] "word_count"                   "utterance_count"             
-#  [5] "performance" "baseline"                   
+#  [5] "performance_difference" "baseline"                   
 #  [7] "time"                         "word_min"                    
 #  [9] "utterance_min"                "TakeItSerious_Game_1"        
 # [11] "TakeItSerious_Survey_1"       "Age"                         
@@ -389,33 +402,8 @@ names(recoded_full_df)
 
 correlation_zeroOrder_plot(
   df = recoded_full_df, 
-  original_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance", "baseline", "time", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS"), 
-  renamed_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance", "baseline", "time",  "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable")) ## there is no correlation between performance and the extent to which they talk out loud during the game. 
-
-```
-
-```{r xxx, include=FALSE}
-
-
-#  [1] "pleasetypeyourfullname(first&last),andmakesureit'saccuratesincewe'llneedittomatchwiththegameresult.\n\n\ntheinformationinthisstudywillbeusedonlyforresearchpurposesandinwaysthatwillnotrevealwhoyouare.yournamewilllaterbereplacedbyarandomlygeneratedidduringthedataanalysisofthestudy"
-#  [2] "{\"importid\":\"qid3_text\"}"                                                                                                                                                                                                                                                           
-#  [3] "jennifercastaneda"                                                                                                                                                                                                                                                                      
-#  [4] "myname"                                                                                                                                                                                                                                                                                 
-#  [5] "nayelilopez"                                                                                                                                                                                                                                                                            
-#  [6] "weijouhuang"                                                                                                                                                                                                                                                                            
-#  [7] "honganhnguyen"                                                                                                                                                                                                                                                                          
-#  [8] "diannalopez"                                                                                                                                                                                                                                                                            
-#  [9] "benjaminhadler"                                                                                                                                                                                                                                                                         
-# [10] "natalievarelamares"                                                                                                                                                                                                                                                                     
-# [11] "victoriamoralesvargas"                                                                                                                                                                                                                                                                  
-# [12] "ershuanglu"                                                                                                                                                                                                                                                                             
-# [13] "chloelin"                                                                                                                                                                                                                                                                               
-# [14] "jacquelinemanzano-eugenio"                                                                                                                                                                                                                                                              
-# [15] "tianlijiang"                                                                                                                                                                                                                                                                            
-# [16] "britanygutierrez"                                                                                                                                                                                                                                                                       
-# [17] "vanessam.coronel-zapata"                                                                                                                                                                                                                                                                
-# [18] "joshuaanello"                                                                                                                                                                                                                                                                           
-# [19] "jessicaju"
+  original_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance_difference", "performance_ratio",  "baseline_difference", "baseline_ratio", "time", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS"), 
+  renamed_col_list = c("word_count", "word_min", "utterance_count", "utterance_min", "performance_difference", "performance_ratio", "baseline_difference", "baseline_ratio", "time",  "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable")) ## there is no correlation between performance_difference and the extent to which they talk out loud during the game. 
 ```
 
 ```{r SURVEY clean data and recode, echo=FALSE}
@@ -466,9 +454,8 @@ describe(recoded_full_df) # but it also has categorical data
 ```
 
 ```{r EDA, include=FALSE}
-library(tableone)
 
-tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count, utterance_count, baseline, performance, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing, Content_criticize)), 
+tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count, utterance_count, baseline_difference, performance_difference, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing, Content_criticize)), 
                            strata = c("Gender"), 
                            data = recoded_full_df %>% filter(!Gender == "Non-binary"))
   #                                         Stratified by Gender
@@ -477,7 +464,7 @@ tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count
   # word_count (mean (SD))                   62.81 (47.04) 58.34 (41.72)  0.513     
   # utterance_count (mean (SD))              30.56 (10.63) 27.90 (12.36)  0.160     
   # baseline (mean (SD))                     6.35 (2.65)   5.44 (2.94)   0.044     
-  # performance (mean (SD))  5.89 (3.98)   5.90 (3.68)   0.982     
+  # performance_difference (mean (SD))  5.89 (3.98)   5.90 (3.68)   0.982     
   # time (mean (SD))                         62.56 (18.31) 70.88 (29.65)  0.054     
   # word_min (mean (SD))                     57.88 (31.50) 52.96 (37.10)  0.386     
   # utterance_min (mean (SD))                30.70 (11.59) 25.87 (11.32)  0.008     
@@ -494,142 +481,152 @@ tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count
 
 print(
   tableOne,
-  nonnormal = c("word_count","word_min", "utterance_count", "baseline", "time", "performance"),
+  nonnormal = c("word_count","word_min", "utterance_count", "baseline_difference", "time", "performance_difference"),
   showAllLevels = TRUE)
-
-# library(DataExplorer)
 # 
 # setwd("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data")
 # recoded_full_df %>%
 #     create_report(
 #         output_file = "EFA_NNPP_Report"
 #     )
-# 
-# library(SmartEDA)
-# 
-# ExpCatStat(recoded_full_df %>% filter(!is.na(performance)), Target="performance", Pclass="1", plot=TRUE)
 ```
 
-```{r analysis , echo=FALSE}
+```{r scaling data, include=FALSE}
+scaled_df = recoded_full_df %>%
+  mutate_at(vars(Content_naming,Content_prasing, Content_criticize), as.numeric) %>%
+  select(word_count: utterance_min, PS_Lkrt_rati: Content_criticize) %>%
+  scale() %>%
+  data.frame()
 
-full_model_word = lmer(data = recoded_full_df, performance ~ baseline * word_count + (1|Participant))
-lesion_model_word = lmer(data = recoded_full_df, performance ~ baseline + word_count + (1|Participant))
+scaled_full_df = cbind(recoded_full_df %>%
+  select(Participant, trial, TakeItSerious_Game_1:SSS_family, language), scaled_df) 
+```
 
-tab_model(lesion_model_word,full_model_word, p.val = "kr" )
+```{r analysis, echo=FALSE}
 
-plot_model(full_model_word, type = "pred", terms = c("word_count", "baseline"))
+full_model_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_count + (1|Participant))
+lesion_model_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + word_count + (1|Participant))
 
-full_model_word_time = lmer(data = recoded_full_df, performance ~ time * baseline * word_count + (1|Participant))
-tab_model(full_model_word_time, p.val = "kr" )
+tab_model(full_model_word_ratio,lesion_model_word_ratio, p.val = "kr" )
 
-# Data: performance_baseline_talk_time_survey
+full_model_word_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference * word_count + (1|Participant))
+lesion_model_word_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + word_count + (1|Participant))
+
+tab_model(full_model_word_diff,lesion_model_word_diff, p.val = "kr" )
+
+plot_model(full_model_word_ratio, type = "pred", terms = c("word_count", "baseline_ratio"))
+plot_model(full_model_word_diff, type = "pred", terms = c("word_count", "baseline_difference"))
+
+# Data: performance_difference_baseline_talk_time_survey
 # Models:
-# lesion_model_word: performance ~ baseline + word_count + (1 | Participant)
-# full_model_word: performance ~ baseline * word_count + (1 | Participant)
+# lesion_model_word: performance_difference ~ baseline + word_count + (1 | Participant)
+# full_model_word: performance_difference ~ baseline * word_count + (1 | Participant)
 #                   npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)
 # lesion_model_word    5 1242.0 1259.3 -616.02   1232.0                     
 # full_model_word      6 1243.7 1264.4 -615.84   1231.7 0.3517  1     0.5531
 
-full_model_utterance = lmer(data = recoded_full_df, performance ~ baseline * utterance_count + (1|Participant))
-lesion_model_utterance = lmer(data = recoded_full_df, performance ~ baseline + utterance_count + (1|Participant))
-tab_model(lesion_model_utterance,full_model_utterance, p.val = "kr" )
+full_model_utterance_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference * utterance_count + (1|Participant))
+lesion_model_utterance_diff = lmer(data = scaled_full_df, performance_difference   ~ baseline_difference + utterance_count + (1|Participant))
+tab_model(full_model_utterance_diff,lesion_model_utterance_diff, p.val = "kr" )
+plot_model(full_model_utterance_diff, type = "pred", terms = c("utterance_count", "baseline_difference"))
 
-# Data: recoded_full_df
+# Data: scaled_full_df
 # Models:
-# lesion_model_utterance: performance ~ baseline + utterance_count + (1 | Participant)
-# full_model_utterance: performance ~ baseline * utterance_count + (1 | Participant)
+# lesion_model_utterance: performance_difference ~ baseline + utterance_count + (1 | Participant)
+# full_model_utterance: performance_difference ~ baseline * utterance_count + (1 | Participant)
 #                        npar    AIC    BIC  logLik deviance Chisq Df Pr(>Chisq)
 # lesion_model_utterance    5 1244.2 1261.4 -617.08   1234.2                    
 # full_model_utterance      6 1246.2 1266.9 -617.08   1234.2 0.008  1     0.9286
 
-plot_model(full_model_utterance, type = "pred", terms = c("utterance_count", "baseline"))
+plot_model(full_model_utterance_diff, type = "pred", terms = c("utterance_count", "baseline_difference"))
 
 
-full_model_utterance_min = lmer(data = recoded_full_df, performance ~ baseline * utterance_min + (1|Participant))
-lesion_model_min = lmer(data = recoded_full_df, performance ~ baseline + utterance_min + (1|Participant))
+m1_utterance_min_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference * utterance_min + (1|Participant))
+m0_utterance_min_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + utterance_min + (1|Participant))
 
-tab_model(lesion_model_min,full_model_utterance_min, p.val = "kr" )
-plot_model(full_model_utterance_min, type = "pred", terms = c("utterance_min", "baseline"))
+tab_model(m1_utterance_min_diff,m0_utterance_min_diff, p.val = "kr" )
+plot_model(m1_utterance_min_diff, type = "pred", terms = c("utterance_min", "baseline_difference"))
 
-# Data: performance_baseline_talk_time_survey
-# Models:
-# lesion_model_min: performance ~ baseline + utterance_min + (1 | Participant)
-# full_model_utterance_min: performance ~ baseline * utterance_min + (1 | Participant)
-#                          npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)
-# lesion_model_min            5 1201.5 1218.7 -595.75   1191.5                     
-# full_model_utterance_min    6 1202.3 1222.8 -595.13   1190.3 1.2475  1      0.264
+full_model_word_min_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference * word_min + (1|Participant))
+lesion_word_min_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + word_min + (1|Participant))
 
-full_model_word_min = lmer(data = recoded_full_df, performance ~ baseline * word_min + (1|Participant))
-lesion_word_min = lmer(data = recoded_full_df, performance ~ baseline + word_min + (1|Participant))
+tab_model(full_model_word_min_diff,lesion_word_min_diff, p.val = "kr" )
 
-tab_model(lesion_word_min,full_model_word_min, p.val = "kr" )
-# Data: performance_baseline_talk_time_survey
-# Models:
-# lesion_word_min: performance ~ baseline + word_min + (1 | Participant)
-# full_model_word_min: performance ~ baseline * word_min + (1 | Participant)
-#                     npar    AIC    BIC  logLik deviance  Chisq Df Pr(>Chisq)
-# lesion_word_min        5 1211.5 1228.7 -600.76   1201.5                     
-# full_model_word_min    6 1213.1 1233.7 -600.56   1201.1 0.4002  1      0.527
-plot_model(full_model_word_min, type = "pred", terms = c("word_min", "baseline"))
+plot_model(full_model_word_min_diff, type = "pred", terms = c("word_min", "baseline_difference"))
+##
+full_model_word_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_min + (1|Participant))
+lesion_word_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + word_min + (1|Participant))
+
+tab_model(full_model_word_min_ratio,lesion_word_min_ratio, p.val = "kr" )
+
+plot_model(full_model_word_min_diff, type = "pred", terms = c("word_min", "baseline_difference"))
+
+full_model_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_min + (1|Participant))
+lesion_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio+ utterance_min + (1|Participant))
+
+tab_model(full_model_utterance_min_ratio, lesion_utterance_min_ratio, p.val = "kr" )
+full_model_word_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_min + (1|Participant))
+lesion_model_word_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + word_min + (1|Participant))
+
+tab_model(full_model_word_min_ratio,lesion_model_word_min_ratio,  p.val = "kr" )
 
 ### looking at main effect 
-no_word_min = lmer(data = recoded_full_df %>% filter(!is.na(word_min)), performance ~ baseline + (1|Participant))
-lesion_word_min = lmer(data = recoded_full_df %>% filter(!is.na(word_min)), performance ~ baseline + word_min + (1|Participant))
+no_word_min = lmer(data = scaled_full_df %>% filter(!is.na(word_min)), performance_difference ~ baseline_difference + (1|Participant))
+lesion_word_min = lmer(data = scaled_full_df %>% filter(!is.na(word_min)), performance_difference ~ baseline_difference + word_min + (1|Participant))
 tab_model(no_word_min, lesion_word_min, p.val = "kr")
 plot_model(lesion_word_min, type = "pred", terms = c("word_min"))
 
 
-no_utterance_min = lmer(data = recoded_full_df %>% filter(!is.na(utterance_min)), performance ~ baseline + (1|Participant))
-lesion_utterance_min = lmer(data = recoded_full_df %>% filter(!is.na(utterance_min)), performance ~ baseline + utterance_min + (1|Participant))
+no_utterance_min = lmer(data = scaled_full_df %>% filter(!is.na(utterance_min)), performance_difference ~ baseline_difference + (1|Participant))
+lesion_utterance_min = lmer(data = scaled_full_df %>% filter(!is.na(utterance_min)), performance_difference ~ baseline_difference + utterance_min + (1|Participant))
 tab_model(no_utterance_min, lesion_utterance_min, p.val = "kr")
 plot_model(lesion_utterance_min, type = "pred", terms = c("utterance_min"))
 
 
-no_word = lmer(data = recoded_full_df %>% filter(!is.na(word_count)), performance ~ baseline + (1|Participant))
-lesion_word = lmer(data = recoded_full_df %>% filter(!is.na(word_count)), performance ~ baseline + word_count + (1|Participant))
+no_word = lmer(data = scaled_full_df %>% filter(!is.na(word_count)), performance_difference ~ baseline_difference + (1|Participant))
+lesion_word = lmer(data = scaled_full_df %>% filter(!is.na(word_count)), performance_difference ~ baseline_difference + word_count + (1|Participant))
 tab_model(no_word, lesion_word, p.val = "kr")
 
-no_utterance = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count)), performance ~ baseline + (1|Participant))
-lesion_utterance = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count)), performance ~ baseline + utterance_count + (1|Participant))
+no_utterance = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count)), performance_difference ~ baseline_difference + (1|Participant))
+lesion_utterance = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count)), performance_difference ~ baseline_difference + utterance_count + (1|Participant))
 
 tab_model(no_utterance, lesion_utterance, p.val = "kr")
 ```
 
 ```{r comfortableness, echo=FALSE}
-no_comfortableness = lmer(data = recoded_full_df %>% filter(!is.na(comfortable_PS)), performance ~ baseline + (1|Participant))
-comfortableness = lmer(data = recoded_full_df %>% filter(!is.na(comfortable_PS)), performance ~ baseline + comfortable_PS + (1|Participant))
-comfortableness_interaction = lmer(data = recoded_full_df %>% filter(!is.na(comfortable_PS)), performance ~ baseline * comfortable_PS + (1|Participant))
+no_comfortableness = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_difference ~ baseline_difference + (1|Participant))
+comfortableness = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_difference ~ baseline_difference + comfortable_PS + (1|Participant))
+comfortableness_interaction = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_difference ~ baseline_difference * comfortable_PS + (1|Participant))
 
 tab_model(comfortableness, comfortableness_interaction, p.val = "kr")
-plot_model(full_model_word_min, type = "pred", terms = c("word_min", "baseline"))
+plot_model(comfortableness, type = "pred")
 
 
-utter_rate_comfort = lmer(data = recoded_full_df, performance ~ baseline * utterance_min +comfortable_PS + (1|Participant))
-tab_model(full_model_utterance_min, utter_rate_comfort, p.val = "kr")
+utter_rate_comfort = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + utterance_min +comfortable_PS + (1|Participant))
+tab_model( utter_rate_comfort, p.val = "kr")
 
-word_rate_comfort = lmer(data = recoded_full_df, performance ~ baseline * word_min +comfortable_PS + (1|Participant))
-tab_model(full_model_word_min, word_rate_comfort, p.val = "kr")
-
-word_rate_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + word_min +comfortable_PS + (1|Participant))
-word_rate_plus = lmer(data = recoded_full_df, performance ~ baseline + word_min + (1|Participant))
-tab_model(word_rate_plus, word_rate_comfort_plus, p.val = "kr")
-
-
-utterance_rate_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + utterance_min +comfortable_PS + (1|Participant))
-utterance_rate_plus = lmer(data = recoded_full_df, performance ~ baseline + utterance_min + (1|Participant))
-tab_model(utterance_rate_plus, utterance_rate_comfort_plus, p.val = "kr")
-
+word_rate_comfort = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + word_min +comfortable_PS + (1|Participant))
+tab_model( word_rate_comfort, p.val = "kr")
 ```
 
 ```{r subjective, include=FALSE}
 ## adding comfortableness
-no_likert = lmer(data = recoded_full_df, performance ~ baseline + (1|Participant))
-lesion_likert = lmer(data = recoded_full_df, performance ~ baseline + PS_Lkrt_rati + (1|Participant))
-interaction_likert = lmer(data = recoded_full_df, performance ~ baseline * PS_Lkrt_rati + (1|Participant))
+no_likert = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + (1|Participant))
 
-baseline_likert_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_Lkrt_rati + (1|Participant))
+lesion_likert = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_Lkrt_rati + (1|Participant))
 
-baseline_likert_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_Lkrt_rati + comfortable_PS+ (1|Participant))
+interaction_likert = lmer(data = scaled_full_df, performance_difference ~ baseline_difference * PS_Lkrt_rati + (1|Participant))
+tab_model(interaction_likert, lesion_likert, p.val = "kr")
+tab_model(lesion_likert, p.val = "kr")
+
+subjective_against_comfort = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_Lkrt_rati + comfortable_PS + (1|Participant))
+tab_model(subjective_against_comfort, p.val = "kr")
+
+
+
+baseline_likert_plus = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_Lkrt_rati + (1|Participant))
+
+baseline_likert_comfort_plus = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_Lkrt_rati + comfortable_PS+ (1|Participant))
 
 
 tab_model(no_likert, lesion_likert, p.val = "kr")
@@ -638,11 +635,11 @@ tab_model(baseline_likert_plus, baseline_likert_comfort_plus, p.val = "kr")
 
 ### adding for percentage
 ## adding comfortableness
-no_pcg = lmer(data = recoded_full_df, performance ~ baseline + (1|Participant))
-lesion_pcg = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + (1|Participant))
-interaction_pcg = lmer(data = recoded_full_df, performance ~ baseline * PS_pcg_rati + (1|Participant))
-baseline_pcg_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + (1|Participant))
-baseline_pcg_comfort_plus = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + comfortable_PS+ (1|Participant))
+no_pcg = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + (1|Participant))
+lesion_pcg = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_pcg_rati + (1|Participant))
+interaction_pcg = lmer(data = scaled_full_df, performance_difference ~ baseline_difference * PS_pcg_rati + (1|Participant))
+baseline_pcg_plus = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_pcg_rati + (1|Participant))
+baseline_pcg_comfort_plus = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_pcg_rati + comfortable_PS+ (1|Participant))
 
 tab_model(no_pcg, lesion_pcg, p.val = "kr")
 tab_model(lesion_pcg, interaction_pcg, p.val = "kr")
@@ -652,27 +649,79 @@ tab_model(baseline_pcg_plus, baseline_pcg_comfort_plus, p.val = "kr")
 ```
 
 ```{r subjective and objective, include=FALSE}
-m1 = lmer(data = recoded_full_df, PS_Lkrt_rati ~ utterance_min + word_min + utterance_count + word_count + (1|Participant))
-summary(lm(data = recoded_full_df, PS_Lkrt_rati ~ utterance_min + word_min + utterance_count + word_count), type = "III")
-m2 = lmer(data = recoded_full_df, performance ~ baseline + PS_pcg_rati + comfortable_PS+ (1|Participant))
+m1 = lmer(data = scaled_full_df, PS_Lkrt_rati ~ utterance_min + word_min + utterance_count + word_count + (1|Participant))
+m2 = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_pcg_rati + comfortable_PS+ (1|Participant))
 
 ```
 
 ```{r baseline and self talk, include=FALSE}
 # are baseline and self talk related - utterance
-m1 = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline ~ time + utterance_count + (1|Participant))
+m1 = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline_difference ~ time + utterance_count + (1|Participant))
 
-m0 = lmer(data = recoded_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline ~ time + (1|Participant))
+m0 = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline_difference ~ time + (1|Participant))
 
 anova(m1,m0)
 
 # are baseline and self talk related - word
-m1 = lmer(data = recoded_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline ~ time + word_count + (1|Participant))
+m1 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ time + word_count + (1|Participant))
 
-m0 = lmer(data = recoded_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline ~ time + (1|Participant))
+m0 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ time + (1|Participant))
 
 anova(m1,m0)
 
-summary(lm(data = recoded_full_df, baseline ~ time + word_count))
+summary(lm(data = scaled_full_df, baseline_difference ~ time + word_count))
+```
 
+```{r determining ration versus difference, include=FALSE}
+# voting for ratio rather than difference because there seems to be a disadvantage for participants whose turns assuming perfect is high - more cognitive load
+## according to the analyses below there is no correlation between the error they are getting and the turns they need to get 
+
+rmcorr(
+  participant = L,
+  measure1 = performance_difference,
+  measure2 = turn_assume_perfect,
+  processing_performance,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+# Repeated measures correlation
+# 
+# r
+# 0.01058324
+# 
+# degrees of freedom
+# 465
+# 
+# p-value
+# 0.8195691
+# 
+# 95% confidence interval
+# -0.08042805 0.1014195 
+
+
+rmcorr(
+  participant = L,
+  measure1 = performance_ratio,
+  measure2 = turn_assume_perfect,
+  dataset = processing_performance,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+# Repeated measures correlation
+# 
+# r
+# -0.06591199
+# 
+# degrees of freedom
+# 465
+# 
+# p-value
+# 0.1549973
+# 
+# 95% confidence interval
+# -0.1559114 0.02517277 
 ```
