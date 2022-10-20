@@ -38,10 +38,12 @@ raw_word_utterance_count = read_csv("/Users/guoxinqieve/Library/CloudStorage/One
 raw_time = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/experiment_spreadsheet.csv")
 
 raw_survey = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/SelfTalk_Winter2022_NNPP_October 9, 2022_10.45.csv") 
+
+raw_content_count = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/content_everyone.csv") 
 ```
 
 ```{r data processing, include=FALSE}
-# change characters to lower case, remove the spaces, and irrelevant strings in character strings, also create long dataset for performance_difference and private speech combination
+# change characters to lower case, remove the spaces, and irrelevant strings in character strings, also create long data set for performance_difference and private speech combination
 processing_performance = raw_performance %>%
   mutate_if(is.character, tolower) %>% 
   mutate_if(is.character, gsub, pattern =" ", replace = "") %>%
@@ -50,12 +52,12 @@ processing_performance = raw_performance %>%
   mutate_if(is.character, gsub, pattern ="-", replace = "") %>%
   mutate(trial = readr::parse_number(L)) %>%
   mutate(L = gsub("[0-9]", "", L))
-   
+
 baseline = processing_performance %>% 
   filter(trial <= 2) %>%
   group_by(L) %>% 
-  mutate(baseline_difference = mean(performance_difference, na.rm = T), 
-         baseline_ratio = mean(performance_ratio, na.rm = T))
+  dplyr::summarise(baseline_difference = mean(performance_difference, na.rm = T), 
+         baseline_ratio = mean(performance_ratio, na.rm = T)) 
 
 performance_baseline = left_join(
   processing_performance %>% filter(trial >=3), 
@@ -79,6 +81,18 @@ processing_word_utterance_count = raw_word_utterance_count %>%
                                     "utteranceCountTrial3" = "3", 
                                     "utteranceCountTrial4" = "4"))
 
+processing_content_count = raw_content_count %>%
+  mutate_if(is.character, tolower) %>% 
+  mutate_if(is.character, gsub, pattern =" ", replace = "") %>% 
+  mutate_if(is.character, gsub, pattern =".csv", replace = "") %>%
+  mutate_if(is.character, gsub, pattern ="-", replace = "")  
+
+processing_content_count_wide = processing_content_count %>%
+  pivot_wider(
+    names_from = content_type,
+    values_from =count, 
+    values_fill = 0)
+
 processing_word_utterance_long = full_join(word_count, utterance_count, by = c("L", "trial")) 
 
 performance_baseline$trial = as.character(performance_baseline$trial)
@@ -94,6 +108,7 @@ processing_time = raw_time %>%
   mutate(trial = dplyr::recode(trial, "Time1" = "1", "Time2" = "2", "Time3" = "3", "Time4" = "4"))
 
 performance_baseline_talk =  full_join(processing_word_utterance_long, performance_baseline, by = c("trial", "L"))
+
 
 audio_yes_performance_difference_no = setdiff(processing_word_utterance_long$L, performance_baseline$L)
 # character(0)
@@ -111,6 +126,10 @@ processing_time$trial = as.numeric(processing_time$trial)
 performance_baseline_talk$trial = as.numeric(performance_baseline_talk$trial)
 names(performance_baseline_talk)[names(performance_baseline_talk)== "L"] = "Participant"
 
+performance_yes_content_no = setdiff(performance_baseline_talk$Participant, processing_content_count_wide$Participant)
+performance_no_content_yes = setdiff(processing_content_count_wide$Participant,performance_baseline_talk$Participant)
+
+performance_baseline_talk =  left_join(performance_baseline_talk, processing_content_count_wide, by = c("trial", "Participant"))
 
 outlier_baseline = performance_baseline_talk %>% na.omit %>%
   select(Participant, baseline_ratio, baseline_difference) %>%
@@ -281,6 +300,9 @@ recoded_full_df = performance_baseline_talk_time_survey %>%
                     "10 (the best off)" = "10", )) %>%
   mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize, SSS_self, SSS_family), 
             ~ as.numeric(.))
+
+
+
 
 write_csv(recoded_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/recoded_full_df.csv")
 ```
@@ -454,8 +476,11 @@ describe(recoded_full_df) # but it also has categorical data
 ```
 
 ```{r EDA, include=FALSE}
+recoded_full_df$Content_criticize = as.numeric(recoded_full_df$Content_criticize)
+recoded_full_df$Content_naming = as.numeric(recoded_full_df$Content_naming)
+recoded_full_df$Content_prasing = as.numeric(recoded_full_df$Content_prasing)
 
-tableOne <- CreateTableOne(vars = colnames(recoded_full_df %>% select(word_count, utterance_count, baseline_difference, performance_difference, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing, Content_criticize)), 
+tableOne <- CreateTableOne(vars = colnames(recoded_full_df), 
                            strata = c("Gender"), 
                            data = recoded_full_df %>% filter(!Gender == "Non-binary"))
   #                                         Stratified by Gender
@@ -483,27 +508,64 @@ print(
   tableOne,
   nonnormal = c("word_count","word_min", "utterance_count", "baseline_difference", "time", "performance_difference"),
   showAllLevels = TRUE)
-# 
-# setwd("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data")
-# recoded_full_df %>%
-#     create_report(
-#         output_file = "EFA_NNPP_Report"
-#     )
+
+setwd("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data")
+recoded_full_df %>%
+    create_report(
+        output_file = "EFA_NNPP_Report"
+    )
 ```
 
 ```{r scaling data, include=FALSE}
 scaled_df = recoded_full_df %>%
   mutate_at(vars(Content_naming,Content_prasing, Content_criticize), as.numeric) %>%
   select(word_count: utterance_min, PS_Lkrt_rati: Content_criticize) %>%
+  mutate(all_content = ambiguousunclear + naming+ reaction+recall +recognition + negativeaffect+ positiveaffect+ location+ multipurpose+ strategy+ uninformativeattention + loop + describing + irrelevant + other) %>%
+  mutate(ambiguous_rate = ambiguousunclear/time,
+         naming_rate = naming/time,
+         reaction_rate = reaction/time,
+         recall_rate = recall/time,
+         recognition_rate = recognition/time,
+         negativeaffect_rate = negativeaffect/time,
+         positiveaffect_rate = positiveaffect/time,
+         location_rate = location/time,
+         multipurpose_rate = multipurpose/time,
+         strategy_rate = strategy/time,
+         uninformative_rate = uninformativeattention/time,
+         loop_rate = loop/time, 
+         describing_rate = describing/time,
+         irrelevant_rate = irrelevant/time) %>%
+  # the ones below are commented out as it doesn't make sense to 
+  # mutate(ambiguous_pcg = ambiguousunclear/all_content,
+  #        naming_pcg = naming/all_content,
+  #        reaction_pcg = reaction/all_content,
+  #        recall_pcg = recall/all_content,
+  #        recognition_pcg = recognition/all_content,
+  #        negativeaffect_pcg = negativeaffect/all_content,
+  #        positiveaffect_pcg = positiveaffect/all_content,
+  #        location_pcg = location/all_content,
+  #        multipurpose_pcg = multipurpose/all_content,
+  #        strategy_pcg = strategy/all_content,
+  #        uninformative_pcg = uninformativeattention/all_content,
+  #        loop_pcg = loop/all_content, 
+  #        describing_pcg = describing/all_content,
+  #        irrelevant_pcg = irrelevant/all_content) %>%
   scale() %>%
   data.frame()
 
 scaled_full_df = cbind(recoded_full_df %>%
   select(Participant, trial, TakeItSerious_Game_1:SSS_family, language), scaled_df) 
+
+write_csv(scaled_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/scaled_full_df.csv")
+
+setwd("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data")
+scaled_full_df %>%
+    create_report(
+        output_file = "scaled_NNPP_Report"
+    )
 ```
 
 ```{r analysis, echo=FALSE}
-
 full_model_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_count + (1|Participant))
 lesion_model_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + word_count + (1|Participant))
 
@@ -564,7 +626,48 @@ plot_model(full_model_word_min_diff, type = "pred", terms = c("word_min", "basel
 full_model_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_min + (1|Participant))
 lesion_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio+ utterance_min + (1|Participant))
 
+plot_model(full_model_utterance_min_ratio, type = "pred", terms = c("utterance_min", "baseline_ratio"), title = "Performance as a function of\nprivate speech usage and baseline", axis.title = c("Standardized utterances per minute", "Standardized Performanace Ratio"), colors = c("#FFBF00","#808080","#0A7029")) + theme_classic() + aes(linetype= group)
+
+# note to self this plot in EF_Rate_control_DifferentDF_Plot from PrivateSpeech.Rmd is the phase 1 data.
+b = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/phase_1_interaction.csv")
+b$EF_turns = b$EF/2
+b$DF_turns = b$DF/2
+interaction_PS_Flips = lm(data = b, EF_turns ~ DF_turns * RATE)
+summary(interaction_PS_Flips)
+EF_Rate_control_DifferentDF_Plot = plot_model(interaction_PS_Flips, type = "pred", terms = c("RATE", "DF_turns"), title = "Phase 1: Performance as a function of\nprivate speech usage and baseline", axis.title = c("Utterances per minute", "Actual turns used"), colors = c("#FFBF00","#808080","#0A7029")) + theme_classic() + aes(linetype= group) + scale_y_continuous( limits = c(0, 65))
+car::Anova(lm(EF_turns ~ DF_turns * RATE, data=b, contrasts=list(topic=contr.sum, sys=contr.sum), type=3))
+car::Anova(lm(ET ~ DT * RATE, data=b, contrasts=list(topic=contr.sum, sys=contr.sum), type=3))
+cor.test(b$EF, b$ET)
+# 	Pearson's product-moment correlation
+# 
+# data:  b$EF and b$ET
+# t = 1.5283, df = 55, p-value = 0.1322
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  -0.06198868  0.43930266
+# sample estimates:
+#       cor 
+# 0.2018391 
+cor.test(b$DF, b$DT)
+# 
+# 	Pearson's product-moment correlation
+# 
+# data:  b$DF and b$DT
+# t = 3.0395, df = 55, p-value = 0.003623
+# alternative hypothesis: true correlation is not equal to 0
+# 95 percent confidence interval:
+#  0.1316723 0.5822605
+# sample estimates:
+#       cor 
+# 0.3792288 
+
+interaction_PS_Time = lm(data = b, ET ~ DT * RATE)
+
+ET_Rate_control_DifferentDT_Plot = plot_model(interaction_PS_Time, type = "pred", terms = c("RATE", "DT"), title = "Phase 1: Performance as a function of\nprivate speech usage and baseline", axis.title = c("Utterances per minute", "Total time used"), colors = c("#FFBF00","#808080","#0A7029")) + theme_classic() + aes(linetype= group) + scale_y_continuous(limits = c(0, 200))
+
 tab_model(full_model_utterance_min_ratio, lesion_utterance_min_ratio, p.val = "kr" )
+
+
 full_model_word_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_min + (1|Participant))
 lesion_model_word_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + word_min + (1|Participant))
 
@@ -607,9 +710,47 @@ tab_model( utter_rate_comfort, p.val = "kr")
 
 word_rate_comfort = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + word_min +comfortable_PS + (1|Participant))
 tab_model( word_rate_comfort, p.val = "kr")
+
+##### ratio
+no_comfortableness = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_ratio ~ baseline_ratio + (1|Participant))
+comfortableness = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_ratio ~ baseline_ratio + comfortable_PS + (1|Participant))
+comfortableness_interaction = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_ratio ~ baseline_ratio * comfortable_PS + (1|Participant))
+
+tab_model(comfortableness, comfortableness_interaction, p.val = "kr")
+plot_model(comfortableness, type = "pred")
+
+
+comfortableness_utterance = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_ratio ~ baseline_ratio + utterance_min+ comfortable_PS + (1|Participant))
+
+comfortableness_utterance_interaction = lmer(data = scaled_full_df %>% filter(!is.na(comfortable_PS)), performance_ratio ~ baseline_ratio + utterance_min*comfortable_PS + (1|Participant))
+
+tab_model(comfortableness_utterance, p.val = "kr")
+tab_model(comfortableness_utterance_interaction, p.val = "kr")
+
+rmcorr(
+  participant = Participant,
+  measure1 = comfortable_PS,
+  measure2 = utterance_min,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+
+rmcorr(
+  participant = Participant,
+  measure1 = comfortable_PS,
+  measure2 = baseline_ratio,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
 ```
 
-```{r subjective, include=FALSE}
+```{r subjective, echo=FALSE}
 ## adding comfortableness
 no_likert = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + (1|Participant))
 
@@ -654,22 +795,21 @@ m2 = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + 
 
 ```
 
-```{r baseline and self talk, include=FALSE}
-# are baseline and self talk related - utterance
-m1 = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline_difference ~ time + utterance_count + (1|Participant))
+```{r baseline and self talk, echo=FALSE}
+# are baseline and self talk related - utterance 
+m1 = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline_difference ~ 1+ utterance_min + (1|Participant))
 
-m0 = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline_difference ~ time + (1|Participant))
+m0 = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count), !is.na(time)), baseline_difference ~ 1 + (1|Participant))
 
-anova(m1,m0)
+anova(m1,m0) # utterance_min does not predict baseline
 
 # are baseline and self talk related - word
-m1 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ time + word_count + (1|Participant))
+m1 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ 1+ word_min + (1|Participant))
 
-m0 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ time + (1|Participant))
+m0 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ 1 + (1|Participant))
 
-anova(m1,m0)
+anova(m1,m0) # count_min does not predict baseline
 
-summary(lm(data = scaled_full_df, baseline_difference ~ time + word_count))
 ```
 
 ```{r determining ration versus difference, include=FALSE}
@@ -724,4 +864,194 @@ rmcorr(
 # 
 # 95% confidence interval
 # -0.1559114 0.02517277 
+```
+
+```{r which objective is closer to subjective, include = FALSE}
+rmcorr(
+  participant = Participant,
+  measure1 = PS_Lkrt_rati,
+  measure2 = utterance_min,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+# Repeated measures correlation
+# 
+# r
+# 0.1866851
+# 
+# degrees of freedom
+# 113
+# 
+# p-value
+# 0.04574886
+# 
+# 95% confidence interval
+# 0.002025097 0.3590332 
+
+rmcorr(
+  participant = Participant,
+  measure1 = PS_Lkrt_rati,
+  measure2 = utterance_count,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+# Repeated measures correlation
+# 
+# r
+# -0.001509061
+# 
+# degrees of freedom
+# 116
+# 
+# p-value
+# 0.9870604
+# 
+# 95% confidence interval
+# -0.1837751 0.1808573 
+
+rmcorr(
+  participant = Participant,
+  measure1 = PS_Lkrt_rati,
+  measure2 = word_min,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+# Repeated measures correlation
+# 
+# r
+# 0.2132152
+# 
+# degrees of freedom
+# 113
+# 
+# p-value
+# 0.02214482
+# 
+# 95% confidence interval
+# 0.02965332 0.382865 
+
+rmcorr(
+  participant = Participant,
+  measure1 = PS_Lkrt_rati,
+  measure2 = word_count,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+# Repeated measures correlation
+
+# r
+# 0.08955015
+# 
+# degrees of freedom
+# 116
+# 
+# p-value
+# 0.3348717
+# 
+# 95% confidence interval
+# -0.09430615 0.2674994
+```
+
+```{r content, echo=FALSE}
+# content analysis
+full_content_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + ambiguous_rate+
+         naming_rate +
+         reaction_rate +
+         recall_rate+
+         recognition_rate +
+         negativeaffect_rate +
+         positiveaffect_rate+
+         location_rate +
+         multipurpose_rate +
+         strategy_rate +
+         uninformative_rate +
+         loop_rate +
+         describing_rate +
+         irrelevant_rate + (1|Participant))
+
+full_content_word_ratio_comfort = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + ambiguous_rate+
+         naming_rate +
+         reaction_rate +
+         recall_rate+
+         recognition_rate +
+         negativeaffect_rate +
+         positiveaffect_rate+
+         location_rate +
+         multipurpose_rate +
+         strategy_rate +
+         uninformative_rate +
+         loop_rate +
+         describing_rate +
+         irrelevant_rate + comfortable_PS+ (1|Participant))
+
+tab_model(full_content_word_ratio_comfort,p.val = "kr" )
+
+
+full_content_word_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference +ambiguousunclear +naming+reaction +recall+recognition+negativeaffect+positiveaffect+location +multipurpose + strategy+ uninformativeattention+ loop +describing+irrelevant+ (1|Participant))
+
+tab_model(full_content_word_diff,p.val = "kr" )
+# ### content analysis but with percentages-- performance difference
+# full_content_pcg_word_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference +ambiguous_pcg +naming_pcg+reaction_pcg +recall_pcg+recognition_pcg+negativeaffect_pcg+positiveaffect_pcg+location_pcg +multipurpose_pcg + strategy_pcg+ uninformative_pcg+ loop_pcg +describing_pcg+irrelevant_pcg+ (1|Participant))
+# tab_model(full_content_pcg_word_diff,p.val = "kr" )
+# 
+# ### content analysis but with percentages -- performance ratio
+# full_content_pcg_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio +ambiguous_pcg +naming_pcg+reaction_pcg +recall_pcg+recognition_pcg+negativeaffect_pcg+positiveaffect_pcg+location_pcg +multipurpose_pcg + strategy_pcg+ uninformative_pcg+ loop_pcg +describing_pcg+irrelevant_pcg+ (1|Participant))
+# 
+# tab_model(full_content_pcg_word_ratio,p.val = "kr" )
+```
+
+```{r graphs, include=FALSE}
+ggplot(data = recoded_full_df, aes(x = turn_assume_perfect)) +
+  geom_histogram(color="black", fill="white") +
+  theme_classic() +
+  labs(title = "Number of turns needed when no errors were made\nvaries from trial to trial (due to luck)", x = "Turns assume no memory error", y = "number of trials")
+
+ggplot(data = recoded_full_df, aes(x = comfortable_PS)) +
+  geom_histogram(color="black", fill="white") +
+  theme_classic() +
+  labs(title = "The vast majority of the participants are\ncomfortable with talking out-loud", x = "Comfortableness with Talking Out-loud during the Game", y = "Count") + scale_x_continuous( breaks = c(0, 8, 1))
+
+
+recoded_full_df$Gender[recoded_full_df$Gender == "Man"] = "Men"
+  
+ggplot(data = recoded_full_df, aes(x = performance_ratio)) +
+  geom_histogram(color="black", fill="white") +
+  theme_classic() +
+  labs(title = "Distribution of Performance Ratio", x = "Performance ratio", y = "Number of Trials") +
+  scale_x_continuous(breaks = seq(0.5, 2.5, by = 0.5)) +
+  geom_vline(data=mu, aes(xintercept=grp.mean, color=Gender),
+             linetype="dashed")+
+  theme(legend.position="top")
+
+library(plyr)
+mu <- ddply(recoded_full_df %>% filter(Gender == "Man" | Gender == "Women"), "Gender", summarise, grp.mean=mean(performance_ratio, na.rm = T))
+head(mu)
+
+mu <- ddply(recoded_full_df %>% filter(Gender == "Man" | Gender == "Women"), "Gender", summarise, grp.mean=mean(baseline_ratio, na.rm = T))
+head(mu)
+
+```
+
+```{r group comparison, include=FALSE}
+# there 
+if_condition_matters = processing_performance %>%
+  mutate(condition = ifelse(trial >= 3, "private_speech", "neutral"))
+
+if_condition_matters_model = lmer(data = if_condition_matters, performance_ratio ~  1 + condition + (1|L))
+if_condition_matters_null = lmer(data = if_condition_matters, performance_ratio ~  1 + (1|L))
+anova(if_condition_matters_null, if_condition_matters_model)
+
+tab_model(if_condition_matters_model, p.val = "kr")
 ```
