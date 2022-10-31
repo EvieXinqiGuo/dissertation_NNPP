@@ -301,9 +301,6 @@ recoded_full_df = performance_baseline_talk_time_survey %>%
   mutate_at(vars(PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_pcg_rati, Age, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_talk_pcg_conf,	comfortable_PS, Content_naming, Content_prasing, Content_criticize, SSS_self, SSS_family), 
             ~ as.numeric(.))
 
-
-
-
 write_csv(recoded_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/recoded_full_df.csv")
 ```
 
@@ -517,10 +514,23 @@ recoded_full_df %>%
 ```
 
 ```{r scaling data, include=FALSE}
-scaled_df = recoded_full_df %>%
+all_content_full_df = recoded_full_df %>%
   mutate_at(vars(Content_naming,Content_prasing, Content_criticize), as.numeric) %>%
-  select(word_count: utterance_min, PS_Lkrt_rati: Content_criticize) %>%
   mutate(all_content = ambiguousunclear + naming+ reaction+recall +recognition + negativeaffect+ positiveaffect+ location+ multipurpose+ strategy+ uninformativeattention + loop + describing + irrelevant + other) %>%
+  mutate(ambiguous_pcg = ambiguousunclear/all_content,
+         naming_pcg = naming/all_content,
+         reaction_pcg = reaction/all_content,
+         recall_pcg = recall/all_content,
+         recognition_pcg = recognition/all_content,
+         negativeaffect_pcg = negativeaffect/all_content,
+         positiveaffect_pcg = positiveaffect/all_content,
+         location_pcg = location/all_content,
+         multipurpose_pcg = multipurpose/all_content,
+         strategy_pcg = strategy/all_content,
+         uninformative_pcg = uninformativeattention/all_content,
+         loop_pcg = loop/all_content,
+         describing_pcg = describing/all_content,
+         irrelevant_pcg = irrelevant/all_content) %>%
   mutate(ambiguous_rate = ambiguousunclear/time,
          naming_rate = naming/time,
          reaction_rate = reaction/time,
@@ -534,24 +544,45 @@ scaled_df = recoded_full_df %>%
          uninformative_rate = uninformativeattention/time,
          loop_rate = loop/time, 
          describing_rate = describing/time,
-         irrelevant_rate = irrelevant/time) %>%
-  # the ones below are commented out as it doesn't make sense to 
-  # mutate(ambiguous_pcg = ambiguousunclear/all_content,
-  #        naming_pcg = naming/all_content,
-  #        reaction_pcg = reaction/all_content,
-  #        recall_pcg = recall/all_content,
-  #        recognition_pcg = recognition/all_content,
-  #        negativeaffect_pcg = negativeaffect/all_content,
-  #        positiveaffect_pcg = positiveaffect/all_content,
-  #        location_pcg = location/all_content,
-  #        multipurpose_pcg = multipurpose/all_content,
-  #        strategy_pcg = strategy/all_content,
-  #        uninformative_pcg = uninformativeattention/all_content,
-  #        loop_pcg = loop/all_content, 
-  #        describing_pcg = describing/all_content,
-  #        irrelevant_pcg = irrelevant/all_content) %>%
+         irrelevant_rate = irrelevant/time)
+
+all_content_full_long = all_content_full_df %>%
+  select(Participant, 
+         ambiguous_pcg, 
+         naming_pcg,
+         reaction_pcg,
+         recall_pcg,
+         recognition_pcg,
+         negativeaffect_pcg,
+         positiveaffect_pcg,
+         location_pcg,
+         multipurpose_pcg,
+         strategy_pcg,
+         uninformative_pcg,
+         loop_pcg,
+         describing_pcg,
+         irrelevant_pcg) %>%
+  pivot_longer(cols = c("ambiguous_pcg", "naming_pcg", "reaction_pcg", "recall_pcg", "recognition_pcg", "negativeaffect_pcg", "positiveaffect_pcg", "location_pcg","multipurpose_pcg", "strategy_pcg", "uninformative_pcg", "loop_pcg", "describing_pcg","irrelevant_pcg"), names_to = "content", values_to = "percentage") 
+
+scaled_df = all_content_full_df %>%
   scale() %>%
   data.frame()
+
+unpopular_yes = recoded_full_df %>% mutate(reaction_yes = ifelse(reaction > 0, "1", "0"), 
+         recall_yes = ifelse(recall > 0, "1", "0"), 
+         recognition_yes = ifelse(recognition > 0, "1", "0"),
+         negativeaffect_yes = ifelse(negativeaffect >0, "1", "0"),
+         positiveaffect_yes = ifelse(positiveaffect >0, "1", "0"),
+         location_yes = ifelse(location > 0, "1", "0"),
+         multipurpose_yes = ifelse(multipurpose >0, "1", "0"),
+         strategy_yes = ifelse(strategy > 0, "1", "0"),
+         uninformative_yes = ifelse(uninformativeattention > 0, "1", "0"),
+         loop_yes = ifelse(loop >0, "1", "0"),
+         describing_yes = ifelse(describing >0, "1", "0"), 
+         ambiguous_yes = ifelse(ambiguousunclear >0, "1", "0"))
+
+scaled_df = cbind(scaled_df,unpopular_yes)
+
 
 scaled_full_df = cbind(recoded_full_df %>%
   select(Participant, trial, TakeItSerious_Game_1:SSS_family, language), scaled_df) 
@@ -627,6 +658,15 @@ full_model_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~
 lesion_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio+ utterance_min + (1|Participant))
 
 plot_model(full_model_utterance_min_ratio, type = "pred", terms = c("utterance_min", "baseline_ratio"), title = "Performance as a function of\nprivate speech usage and baseline", axis.title = c("Standardized utterances per minute", "Standardized Performanace Ratio"), colors = c("#FFBF00","#808080","#0A7029")) + theme_classic() + aes(linetype= group)
+
+#### the graph with baseline regressed out
+plot_model(full_model_utterance_min_ratio, type = "pred", terms = c("utterance_min"), title = "Marginal effect of private speech usage on performance\n- baseline regressed out", axis.title = c("Standardized utterances per minute", "Standardized Performanace Ratio")) + theme_classic()
+
+full_model_utterance_count_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_count + (1|Participant))
+lesion_utterance_count_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio+ utterance_count + (1|Participant))
+
+plot_model(full_model_utterance_count_ratio, type = "pred", terms = c("utterance_count", "baseline_ratio"), title = "Performance as a function of\nprivate speech usage and baseline", axis.title = c("Standardized utterances", "Standardized Performanace Ratio"), colors = c("#FFBF00","#808080","#0A7029")) + theme_classic() + aes(linetype= group)
+
 
 # note to self this plot in EF_Rate_control_DifferentDF_Plot from PrivateSpeech.Rmd is the phase 1 data.
 b = read_csv("/Users/guoxinqieve/Applications/OneDrive - UC San Diego/less old files/concentration_Private_Speech/phase_1_interaction.csv")
@@ -748,6 +788,34 @@ rmcorr(
   nreps = 100,
   bstrap.out = F
 )
+
+rmcorr(
+  participant = Participant,
+  measure1 = utterance_min,
+  measure2 = baseline_ratio,
+  scaled_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+
+tab_model(lmer(data = scaled_full_df, utterance_min~ 1 + baseline_ratio + (1|Participant)), p.val = "kr")
+
+rmcorr(
+  participant = Participant,
+  measure1 = utterance_min,
+  measure2 = naming_pcg,
+  all_content_full_df,
+  CI.level = 0.95,
+  CIs = c("analytic", "bootstrap"),
+  nreps = 100,
+  bstrap.out = F
+)
+
+tab_model(lmer(data = all_content_full_df %>% select(Participant, utterance_min, naming_pcg), utterance_min ~ naming_pcg + (1|Participant)))
+
+
 ```
 
 ```{r subjective, echo=FALSE}
@@ -792,7 +860,6 @@ tab_model(baseline_pcg_plus, baseline_pcg_comfort_plus, p.val = "kr")
 ```{r subjective and objective, include=FALSE}
 m1 = lmer(data = scaled_full_df, PS_Lkrt_rati ~ utterance_min + word_min + utterance_count + word_count + (1|Participant))
 m2 = lmer(data = scaled_full_df, performance_difference ~ baseline_difference + PS_pcg_rati + comfortable_PS+ (1|Participant))
-
 ```
 
 ```{r baseline and self talk, echo=FALSE}
@@ -809,7 +876,6 @@ m1 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), ba
 m0 = lmer(data = scaled_full_df %>% filter(!is.na(word_count), !is.na(time)), baseline_difference ~ 1 + (1|Participant))
 
 anova(m1,m0) # count_min does not predict baseline
-
 ```
 
 ```{r determining ration versus difference, include=FALSE}
@@ -1035,6 +1101,8 @@ ggplot(data = recoded_full_df, aes(x = performance_ratio)) +
              linetype="dashed")+
   theme(legend.position="top")
 
+
+
 library(plyr)
 mu <- ddply(recoded_full_df %>% filter(Gender == "Man" | Gender == "Women"), "Gender", summarise, grp.mean=mean(performance_ratio, na.rm = T))
 head(mu)
@@ -1042,6 +1110,19 @@ head(mu)
 mu <- ddply(recoded_full_df %>% filter(Gender == "Man" | Gender == "Women"), "Gender", summarise, grp.mean=mean(baseline_ratio, na.rm = T))
 head(mu)
 
+summary <- all_content_full_long %>%
+   na.omit %>%
+    group_by(content) %>%
+    dplyr::summarise(mean = mean(percentage, na.rm = T), se = sd(percentage, na.rm = T) / length(!is.na(percentage)))
+
+ggplot(data = summary, aes(x = content, y = mean, fill = content)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean+se),
+                width = 0.2,
+                position = position_dodge(0.9)) +
+  theme_classic()
+
+  
 ```
 
 ```{r group comparison, include=FALSE}
@@ -1054,4 +1135,147 @@ if_condition_matters_null = lmer(data = if_condition_matters, performance_ratio 
 anova(if_condition_matters_null, if_condition_matters_model)
 
 tab_model(if_condition_matters_model, p.val = "kr")
+
+```
+
+```{r regression for unpopular categrories, include=FALSE}
+# 
+# adding variables that correspond to yes/no to the unpopular variables
+content_added_zero_or_not = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio + 
+       ambiguous_rate+ ambiguous_yes +
+         naming_rate +
+         reaction_rate + reaction_yes+
+         recall_rate+recall_yes+
+         recognition_rate +recognition_yes+
+         negativeaffect_rate +negativeaffect_yes +
+         positiveaffect_rate+positiveaffect_yes +
+         location_rate +location_yes+
+         multipurpose_rate +multipurpose_yes + 
+         strategy_rate + strategy_yes+
+         uninformative_rate +uninformative_yes +
+         loop_rate +loop_yes +
+         describing_rate +describing_yes +
+         irrelevant_rate + (1|Participant))
+tab_model(content_added_zero_or_not, p.val = "kr")
+```
+
+```{r content analysis exploratory, include=FALSE}
+content_zero_or_not = lmer(data = scaled_full_df, performance_ratio~ baseline_ratio + naming_rate + ambiguous_yes+ recall_yes + reaction_yes + recognition_yes + negativeaffect_yes + positiveaffect_yes + location_yes + multipurpose_yes + strategy_yes + uninformative_yes + loop_yes + describing_yes+ (1|Participant))
+tab_model(content_zero_or_not, p.val = "kr")
+
+
+content_pcg_utterance_rate = lmer(data = all_content_full_df, performance_ratio~ baseline_ratio+ utterance_min+ambiguous_pcg +naming_pcg+reaction_pcg +recall_pcg+recognition_pcg+negativeaffect_pcg+positiveaffect_pcg+location_pcg +multipurpose_pcg + strategy_pcg+ uninformative_pcg+ loop_pcg +describing_pcg+irrelevant_pcg + (1|Participant))
+
+tab_model(content_pcg_utterance_rate, p.val = "kr")
+
+# ### content analysis but with percentages-- performance difference
+# full_content_pcg_word_diff = lmer(data = scaled_full_df, performance_difference ~ baseline_difference +ambiguous_pcg +naming_pcg+reaction_pcg +recall_pcg+recognition_pcg+negativeaffect_pcg+positiveaffect_pcg+location_pcg +multipurpose_pcg + strategy_pcg+ uninformative_pcg+ loop_pcg +describing_pcg+irrelevant_pcg+ (1|Participant))
+# tab_model(full_content_pcg_word_diff,p.val = "kr" )
+```
+
+```{r plotting distributions, include=FALSE}
+p <- if_condition_matters %>%
+  ggplot( aes(x=performance_ratio, fill=condition)) +
+    geom_density(alpha=0.5)+
+    scale_fill_manual(values=c("#d8b365", "#5ab4ac")) +
+    theme_classic() +
+    labs(fill="")
+
+df_for_2by2_distribution = recoded_full_df %>% 
+  select(Participant, utterance_min, baseline_ratio, performance_ratio, utterance_count) %>%
+  group_by(Participant) %>%
+  dplyr::mutate(individual_performance_average = mean(performance_ratio, na.rm = T), 
+         individual_talk_average = mean(utterance_min, na.rm = T),
+         individual_count_average = mean(utterance_count, na.rm = T)) %>%
+  ungroup() %>%  
+  dplyr::mutate(group_median = median(baseline_ratio, na.rm = T),
+                good_bad = ifelse(baseline_ratio >=group_median, "bad", "good"),
+                group_talk_average = mean(utterance_min, na.rm = T),
+                talker_or_not = ifelse(individual_talk_average >= group_talk_average, "talker", "non_talker"),
+                group_count_average = mean(utterance_min, na.rm = T),
+                talker_by_count = ifelse(individual_count_average >= group_count_average, "talker_count", "non_talker_count")) %>%
+  select(-utterance_min, -performance_ratio, -utterance_count) %>%
+  na.omit() %>%
+  distinct() %>%
+  pivot_longer(cols = c("baseline_ratio", "individual_performance_average"), names_to = "condition", values_to = "performance")
+  
+
+p <- df_for_2by2_distribution %>%
+  mutate_at(vars(condition),
+            ~dplyr::recode(.,
+                     "baseline_ratio" = "baseline", 
+                     "individual_performance_average" = "ps_performance")) %>%
+  ggplot( aes(x=performance, fill=condition)) +
+  geom_histogram(alpha= 0.5, binwidth = 0.01) +
+    scale_fill_manual(values=c("#d8b365", "#5ab4ac")) +
+    theme_classic() +
+    labs(fill="condition", title = "talker or not decided by utterance/min") +
+    facet_grid(vars(talker_or_not), vars(good_bad)) +
+  theme(strip.text.x = element_text(size = 20),
+        strip.text.y = element_text(size = 20)) + 
+  geom_vline(xintercept = 1.28, 
+             linetype="dotted",                
+             color = "blue", 
+             size=1.5)
+# geom_histogram(color="#e9ecef", alpha=0.5, position = 'identity', binwidth = 0.01) 
+
+p <- df_for_2by2_distribution %>%
+  mutate_at(vars(condition),
+            ~dplyr::recode(.,
+                     "baseline_ratio" = "baseline", 
+                     "individual_performance_average" = "ps_performance")) %>%
+  ggplot( aes(x=performance, fill=condition)) +
+    geom_text(
+    size    = 5,
+    data    = ann_text,
+    mapping = aes(x = 1.5, y = 6, label = "text"),
+    inherit.aes=FALSE
+  ) +
+    # geom_density(alpha = 0.5)+
+  geom_histogram(alpha= 0.5, binwidth = 0.01) +
+    scale_fill_manual(values=c("#d8b365", "#5ab4ac")) +
+    theme_classic() +
+    labs(fill="condition", title = "talker or not decided by utterance count") +
+    facet_grid(vars(talker_by_count), vars(good_bad)) +
+  theme(strip.text.x = element_text(size = 20),
+        strip.text.y = element_text(size = 20)) 
+   # geom_text(data = ann_text,label=ann_text$label)
+
+
+# bad & non-talker
+t.test(df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "non_talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "non_talker" & condition == "individual_performance_average") %>% pull(performance), paired = T)
+
+cor.test(df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "non_talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "non_talker" & condition == "individual_performance_average") %>% pull(performance))
+
+# good & non-talker
+t.test(df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "non_talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "non_talker" & condition == "individual_performance_average") %>% pull(performance), paired = T)
+
+cor.test(df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "non_talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "non_talker" & condition == "individual_performance_average") %>% pull(performance))
+
+
+# bad & talker
+t.test(df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "talker" & condition == "individual_performance_average") %>% pull(performance), paired = T)
+
+cor.test(df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "bad" & talker_or_not == "talker" & condition == "individual_performance_average") %>% pull(performance))
+
+# good & talker
+t.test(df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "talker" & condition == "individual_performance_average") %>% pull(performance), paired = T)
+
+cor.test(df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "talker" & condition == "baseline_ratio") %>% pull(performance), df_for_2by2_distribution %>% filter(good_bad == "good" & talker_or_not == "talker" & condition == "individual_performance_average") %>% pull(performance))
+
+
+dat_text <- data.frame(
+   good_bad  = c("bad", "good", "bad", "good"),
+  talker_or_not = c("non_talker", "non_talker", "talker", "talker")
+)
+
+dat_text$label <- c("t(20) = 0.540, p = 0.595 \nr = 0.440, p = 0.046", 
+                    "t(30) = -3.518, p = 0.001 \nr = 0.331, p = 0.067",
+                    "t(36) = 3.406, p = 0.002 \nr = 0.286, p = 0.086",
+                    "t(27) = -2.089, p = 0.046 \nr = 0.176, p = 0.370")
+
+ann_text <- data.frame(good_bad = factor("bad", levels = c("bad", "good")),talker_or_not = "non_talker",lab = "t(20) = 0.540, p = 0.595") %>% 
+  rbind(data.frame(good_bad = factor("good", levels = c("bad", "good")),talker_or_not = "non_talker",lab = "t(30) = -3.518, p = 0.001")) %>%
+  rbind(data.frame(good_bad = factor("bad", levels = c("bad", "good")),talker_or_not = "talker",lab = "t(36) = 3.406, p = 0.002")) %>%
+   rbind(data.frame(good_bad = factor("good", levels = c("bad", "good")),talker_or_not = "talker",lab = "t(27) = -2.089, p = 0.046")) 
 ```

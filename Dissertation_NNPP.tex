@@ -1,0 +1,1722 @@
+% Options for packages loaded elsewhere
+\PassOptionsToPackage{unicode}{hyperref}
+\PassOptionsToPackage{hyphens}{url}
+%
+\documentclass[
+]{article}
+\usepackage{amsmath,amssymb}
+\usepackage{lmodern}
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{textcomp} % provide euro and other symbols
+\else % if luatex or xetex
+  \usepackage{unicode-math}
+  \defaultfontfeatures{Scale=MatchLowercase}
+  \defaultfontfeatures[\rmfamily]{Ligatures=TeX,Scale=1}
+\fi
+% Use upquote if available, for straight quotes in verbatim environments
+\IfFileExists{upquote.sty}{\usepackage{upquote}}{}
+\IfFileExists{microtype.sty}{% use microtype if available
+  \usepackage[]{microtype}
+  \UseMicrotypeSet[protrusion]{basicmath} % disable protrusion for tt fonts
+}{}
+\makeatletter
+\@ifundefined{KOMAClassName}{% if non-KOMA class
+  \IfFileExists{parskip.sty}{%
+    \usepackage{parskip}
+  }{% else
+    \setlength{\parindent}{0pt}
+    \setlength{\parskip}{6pt plus 2pt minus 1pt}}
+}{% if KOMA class
+  \KOMAoptions{parskip=half}}
+\makeatother
+\usepackage{xcolor}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\makeatletter
+\def\maxwidth{\ifdim\Gin@nat@width>\linewidth\linewidth\else\Gin@nat@width\fi}
+\def\maxheight{\ifdim\Gin@nat@height>\textheight\textheight\else\Gin@nat@height\fi}
+\makeatother
+% Scale images if necessary, so that they will not overflow the page
+% margins by default, and it is still possible to overwrite the defaults
+% using explicit options in \includegraphics[width, height, ...]{}
+\setkeys{Gin}{width=\maxwidth,height=\maxheight,keepaspectratio}
+% Set default figure placement to htbp
+\makeatletter
+\def\fps@figure{htbp}
+\makeatother
+\setlength{\emergencystretch}{3em} % prevent overfull lines
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}}
+\setcounter{secnumdepth}{-\maxdimen} % remove section numbering
+\ifLuaTeX
+  \usepackage{selnolig}  % disable illegal ligatures
+\fi
+\IfFileExists{bookmark.sty}{\usepackage{bookmark}}{\usepackage{hyperref}}
+\IfFileExists{xurl.sty}{\usepackage{xurl}}{} % add URL line breaks if available
+\urlstyle{same} % disable monospaced font for URLs
+\hypersetup{
+  pdftitle={Dissertation\_NNPP},
+  hidelinks,
+  pdfcreator={LaTeX via pandoc}}
+
+\title{Dissertation\_NNPP}
+\author{}
+\date{\vspace{-2.5em}2022-10-05}
+
+\begin{document}
+\maketitle
+
+\begin{verbatim}
+## 
+##  Pearson's product-moment correlation
+## 
+## data:  recoded_full_df %>% pull(word_min) and recoded_full_df %>% pull(PS_Lkrt_rati)
+## t = 5.4251, df = 229, p-value = 1.47e-07
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.2178837 0.4470736
+## sample estimates:
+##       cor 
+## 0.3374704
+\end{verbatim}
+
+\begin{verbatim}
+## 
+##  Pearson's product-moment correlation
+## 
+## data:  recoded_full_df %>% pull(word_min) and recoded_full_df %>% pull(PS_pcg_rati)
+## t = 5.8588, df = 229, p-value = 1.61e-08
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.2433085 0.4683006
+## sample estimates:
+##       cor 
+## 0.3610472
+\end{verbatim}
+
+\begin{verbatim}
+## 
+##  Pearson's product-moment correlation
+## 
+## data:  recoded_full_df %>% pull(utterance_min) and recoded_full_df %>% pull(PS_Lkrt_rati)
+## t = 6.7518, df = 229, p-value = 1.188e-10
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.2938318 0.5097253
+## sample estimates:
+##       cor 
+## 0.4074558
+\end{verbatim}
+
+\begin{verbatim}
+## 
+##  Pearson's product-moment correlation
+## 
+## data:  recoded_full_df %>% pull(utterance_min) and recoded_full_df %>% pull(PS_pcg_rati)
+## t = 6.4597, df = 229, p-value = 6.223e-10
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.2775846 0.4965123
+## sample estimates:
+##       cor 
+## 0.3925955
+\end{verbatim}
+
+\begin{verbatim}
+## 
+##  Pearson's product-moment correlation
+## 
+## data:  recoded_full_df %>% pull(utterance_count) and recoded_full_df %>% pull(PS_pcg_rati)
+## t = 7.0711, df = 233, p-value = 1.777e-11
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.3089828 0.5203185
+## sample estimates:
+##       cor 
+## 0.4203347
+\end{verbatim}
+
+\begin{verbatim}
+## 
+##  Pearson's product-moment correlation
+## 
+## data:  recoded_full_df %>% pull(word_count) and recoded_full_df %>% pull(PS_pcg_rati)
+## t = 4.7345, df = 233, p-value = 3.814e-06
+## alternative hypothesis: true correlation is not equal to 0
+## 95 percent confidence interval:
+##  0.1749025 0.4087215
+## sample estimates:
+##       cor 
+## 0.2962441
+\end{verbatim}
+
+\begin{verbatim}
+##  [1] "Participant"                  "trial"                       
+##  [3] "word_count"                   "utterance_count"             
+##  [5] "merged_performance_calcuated" "expertise"                   
+##  [7] "time"                         "word_min"                    
+##  [9] "utterance_min"                "TakeItSerious_Game_1"        
+## [11] "TakeItSerious_Survey_1"       "Age"                         
+## [13] "Gender"                       "Gender_3_TEXT"               
+## [15] "EthnoRacial"                  "ETHNORACIAL_mixed"           
+## [17] "Country_born"                 "Country_growUp"              
+## [19] "AgeToUS"                      "COLLEGE STANDING"            
+## [21] "TRANSFER STUDENT"             "SSS_self"                    
+## [23] "SSS_family"                   "PS_Lkrt_rati"                
+## [25] "PS_Lkt_conf"                  "PS_pcg_rati"                 
+## [27] "PS_talk_pcg_conf"             "comfortable_PS"              
+## [29] "Content_naming"               "Content_prasing"             
+## [31] "Content_criticize"            "language"
+\end{verbatim}
+
+\includegraphics{Dissertation_NNPP_files/figure-latex/corrplot function and corrplot-1.pdf}
+
+\begin{verbatim}
+## select: dropped 29 variables (Participant, trial, word_count, utterance_count, merged_performance_calcuated, …)
+\end{verbatim}
+
+\begin{verbatim}
+## rename: renamed 3 variables (Naming the object that you saw, Saying positive things to yourself (e.g. praising yourself), Saying negative things to yourself (e.g. criticizing yourself))
+\end{verbatim}
+
+\begin{verbatim}
+## mutate_if: converted 'Naming the object that you saw' from character to factor (0 new NA)
+\end{verbatim}
+
+\begin{verbatim}
+##            converted 'Saying positive things to yourself (e.g. praising yourself)' from character to factor (0 new NA)
+\end{verbatim}
+
+\begin{verbatim}
+##            converted 'Saying negative things to yourself (e.g. criticizing yourself)' from character to factor (0 new NA)
+\end{verbatim}
+
+\begin{verbatim}
+## Warning in FUN(newX[, i], ...): no non-missing arguments to min; returning Inf
+\end{verbatim}
+
+\begin{verbatim}
+## Warning in FUN(newX[, i], ...): no non-missing arguments to max; returning -Inf
+\end{verbatim}
+
+\begin{verbatim}
+##                              vars   n  mean    sd median trimmed   mad  min
+## Participant*                    1 238 59.18 34.17  59.00   59.10 44.48  1.0
+## trial                           2 238  3.50  0.50   3.50    3.50  0.74  3.0
+## word_count                      3 235 59.55 42.85  48.00   53.29 31.13  0.0
+## utterance_count                 4 235 29.01 11.93  29.00   29.08 11.86  0.0
+## merged_performance_calcuated    5 233  5.91  3.77   6.00    5.64  4.45  0.0
+## expertise                       6 233  5.77  2.93   5.50    5.54  2.22  0.5
+## time                            7 234 68.48 26.62  63.00   65.25 19.27 33.0
+## word_min                        8 231 54.03 34.59  48.31   49.89 25.06  0.0
+## utterance_min                   9 231 27.50 11.36  27.69   27.38 10.56  0.0
+## TakeItSerious_Game_1           10 236  3.81  0.44   4.00    3.90  0.00  2.0
+## TakeItSerious_Survey_1         11 236  3.97  0.18   4.00    4.00  0.00  3.0
+## Age                            12 214 20.13  1.91  20.00   19.94  1.48 18.0
+## Gender*                        13 238  3.16  1.32   4.00    3.32  0.00  1.0
+## Gender_3_TEXT*                 14   0   NaN    NA     NA     NaN    NA  Inf
+## EthnoRacial*                   15 238  3.04  2.35   3.00    2.81  2.97  1.0
+## ETHNORACIAL_mixed*             16  14  2.86  1.29   3.00    2.83  1.48  1.0
+## Country_born*                  17 238 16.44  6.50  20.00   17.12  0.00  1.0
+## Country_growUp*                18 238 18.83  9.04  24.00   19.51  1.48  1.0
+## AgeToUS*                       19  90 10.27  5.81   9.00   10.24  7.41  1.0
+## COLLEGE STANDING*              20 238  2.47  1.15   3.00    2.46  1.48  1.0
+## TRANSFER STUDENT*              21 234  1.45  0.83   1.00    1.32  0.00  1.0
+## SSS_self*                      22 238  4.04  1.35   4.00    4.08  1.48  1.0
+## SSS_family*                    23 238  5.08  1.75   5.00    5.20  1.48  1.0
+## PS_Lkrt_rati                   24 238  5.35  1.33   6.00    5.49  1.48  1.0
+## PS_Lkt_conf                    25 238  6.18  1.00   6.50    6.34  0.74  3.0
+## PS_pcg_rati                    26 238 74.82 22.03  81.00   77.72 16.31  0.0
+## PS_talk_pcg_conf               27 238  6.02  0.97   6.00    6.15  1.48  3.0
+## comfortable_PS                 28 238  4.87  1.76   5.00    5.01  2.97  1.0
+## Content_naming*                29 236  6.19  1.34   7.00    6.49  0.00  1.0
+## Content_prasing*               30 161  2.34  1.69   2.00    2.02  1.48  1.0
+## Content_criticize*             31 155  1.97  1.29   2.00    1.72  1.48  1.0
+## language*                      32 238  8.75  2.39   9.00    8.79  0.00  1.0
+##                                 max  range  skew kurtosis   se
+## Participant*                 118.00 117.00  0.02    -1.22 2.22
+## trial                          4.00   1.00  0.00    -2.01 0.03
+## word_count                   224.00 224.00  1.58     2.88 2.80
+## utterance_count               66.00  66.00 -0.02     0.12 0.78
+## merged_performance_calcuated  20.00  20.00  0.73     0.45 0.25
+## expertise                     14.00  13.50  0.69     0.06 0.19
+## time                         216.00 183.00  2.20     7.98 1.74
+## word_min                     243.64 243.64  1.80     5.72 2.28
+## utterance_min                 66.32  66.32  0.16     0.39 0.75
+## TakeItSerious_Game_1           4.00   2.00 -2.12     3.77 0.03
+## TakeItSerious_Survey_1         4.00   1.00 -5.12    24.30 0.01
+## Age                           33.00  15.00  3.00    17.22 0.13
+## Gender*                        4.00   3.00 -0.97    -1.03 0.09
+## Gender_3_TEXT*                 -Inf   -Inf    NA       NA   NA
+## EthnoRacial*                   7.00   6.00  0.70    -1.08 0.15
+## ETHNORACIAL_mixed*             5.00   4.00  0.24    -1.17 0.35
+## Country_born*                 24.00  23.00 -1.05    -0.53 0.42
+## Country_growUp*               31.00  30.00 -0.79    -0.97 0.59
+## AgeToUS*                      19.00  18.00  0.20    -1.42 0.61
+## COLLEGE STANDING*              4.00   3.00 -0.06    -1.46 0.07
+## TRANSFER STUDENT*              3.00   2.00  1.30    -0.30 0.05
+## SSS_self*                      7.00   6.00 -0.26    -0.65 0.09
+## SSS_family*                    8.00   7.00 -0.54    -0.60 0.11
+## PS_Lkrt_rati                   7.00   6.00 -0.94     0.51 0.09
+## PS_Lkt_conf                    7.00   4.00 -1.07     0.32 0.06
+## PS_pcg_rati                  100.00 100.00 -1.16     0.95 1.43
+## PS_talk_pcg_conf               7.00   4.00 -0.88     0.20 0.06
+## comfortable_PS                 7.00   6.00 -0.39    -0.88 0.11
+## Content_naming*                7.00   6.00 -2.00     3.72 0.09
+## Content_prasing*               7.00   6.00  1.29     0.62 0.13
+## Content_criticize*             6.00   5.00  1.39     0.99 0.10
+## language*                     18.00  17.00  0.29     5.98 0.16
+\end{verbatim}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+2.36
+
+1.08~--~3.64
+
+\textless0.001
+
+2.70
+
+0.97~--~4.42
+
+0.002
+
+expertise
+
+0.51
+
+0.34~--~0.67
+
+\textless0.001
+
+0.45
+
+0.18~--~0.71
+
+0.001
+
+word count
+
+0.01
+
+-0.00~--~0.02
+
+0.064
+
+0.01
+
+-0.02~--~0.03
+
+0.627
+
+expertise * word count
+
+0.00
+
+-0.00~--~0.00
+
+0.565
+
+Random Effects
+
+σ2
+
+9.40
+
+9.44
+
+τ00
+
+2.63 Participant
+
+2.63 Participant
+
+ICC
+
+0.22
+
+0.22
+
+N
+
+118 Participant
+
+118 Participant
+
+Observations
+
+233
+
+233
+
+Marginal R2 / Conditional R2
+
+0.166 / 0.349
+
+0.167 / 0.348
+
+\includegraphics{Dissertation_NNPP_files/figure-latex/analysis -1.pdf}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+2.34
+
+0.79~--~3.89
+
+0.003
+
+2.23
+
+-0.47~--~4.93
+
+0.105
+
+expertise
+
+0.49
+
+0.32~--~0.67
+
+\textless0.001
+
+0.51
+
+0.12~--~0.91
+
+0.011
+
+utterance count
+
+0.02
+
+-0.02~--~0.07
+
+0.235
+
+0.03
+
+-0.06~--~0.12
+
+0.538
+
+expertise * utterancecount
+
+-0.00
+
+-0.01~--~0.01
+
+0.925
+
+Random Effects
+
+σ2
+
+9.36
+
+9.37
+
+τ00
+
+2.82 Participant
+
+2.87 Participant
+
+ICC
+
+0.23
+
+0.23
+
+N
+
+118 Participant
+
+118 Participant
+
+Observations
+
+233
+
+233
+
+Marginal R2 / Conditional R2
+
+0.158 / 0.353
+
+0.157 / 0.355
+
+\includegraphics{Dissertation_NNPP_files/figure-latex/analysis -2.pdf}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+4.57
+
+3.11~--~6.03
+
+\textless0.001
+
+3.33
+
+0.69~--~5.98
+
+0.014
+
+expertise
+
+0.54
+
+0.38~--~0.70
+
+\textless0.001
+
+0.75
+
+0.34~--~1.17
+
+\textless0.001
+
+utterance min
+
+-0.07
+
+-0.11~--~-0.03
+
+0.001
+
+-0.02
+
+-0.11~--~0.08
+
+0.716
+
+expertise * utterance min
+
+-0.01
+
+-0.02~--~0.01
+
+0.270
+
+Random Effects
+
+σ2
+
+9.09
+
+9.01
+
+τ00
+
+2.05 Participant
+
+2.14 Participant
+
+ICC
+
+0.18
+
+0.19
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.201 / 0.348
+
+0.205 / 0.357
+
+\includegraphics{Dissertation_NNPP_files/figure-latex/analysis -3.pdf}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+3.10
+
+1.79~--~4.42
+
+\textless0.001
+
+2.71
+
+0.92~--~4.51
+
+0.003
+
+expertise
+
+0.51
+
+0.35~--~0.68
+
+\textless0.001
+
+0.59
+
+0.30~--~0.89
+
+\textless0.001
+
+word min
+
+-0.00
+
+-0.02~--~0.01
+
+0.583
+
+0.00
+
+-0.02~--~0.03
+
+0.819
+
+expertise * word min
+
+-0.00
+
+-0.01~--~0.00
+
+0.524
+
+Random Effects
+
+σ2
+
+9.46
+
+9.41
+
+τ00
+
+2.18 Participant
+
+2.28 Participant
+
+ICC
+
+0.19
+
+0.20
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.164 / 0.321
+
+0.165 / 0.328
+
+\includegraphics{Dissertation_NNPP_files/figure-latex/analysis -4.pdf}
+
+\begin{verbatim}
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+\end{verbatim}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+2.89
+
+1.83~--~3.95
+
+\textless0.001
+
+3.10
+
+1.79~--~4.42
+
+\textless0.001
+
+expertise
+
+0.51
+
+0.35~--~0.68
+
+\textless0.001
+
+0.51
+
+0.35~--~0.68
+
+\textless0.001
+
+word min
+
+-0.00
+
+-0.02~--~0.01
+
+0.583
+
+Random Effects
+
+σ2
+
+9.50
+
+9.46
+
+τ00
+
+2.09 Participant
+
+2.18 Participant
+
+ICC
+
+0.18
+
+0.19
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.163 / 0.315
+
+0.164 / 0.321
+
+\begin{verbatim}
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+## filter: removed 7 rows (3%), 231 rows remaining
+\end{verbatim}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+2.89
+
+1.83~--~3.95
+
+\textless0.001
+
+4.57
+
+3.11~--~6.03
+
+\textless0.001
+
+expertise
+
+0.51
+
+0.35~--~0.68
+
+\textless0.001
+
+0.54
+
+0.38~--~0.70
+
+\textless0.001
+
+utterance min
+
+-0.07
+
+-0.11~--~-0.03
+
+0.001
+
+Random Effects
+
+σ2
+
+9.50
+
+9.09
+
+τ00
+
+2.09 Participant
+
+2.05 Participant
+
+ICC
+
+0.18
+
+0.18
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.163 / 0.315
+
+0.201 / 0.348
+
+\begin{verbatim}
+## filter: removed 3 rows (1%), 235 rows remaining
+\end{verbatim}
+
+\begin{verbatim}
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+\end{verbatim}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+3.00
+
+1.91~--~4.09
+
+\textless0.001
+
+2.36
+
+1.08~--~3.64
+
+\textless0.001
+
+expertise
+
+0.51
+
+0.34~--~0.67
+
+\textless0.001
+
+0.51
+
+0.34~--~0.67
+
+\textless0.001
+
+word count
+
+0.01
+
+-0.00~--~0.02
+
+0.064
+
+Random Effects
+
+σ2
+
+9.61
+
+9.40
+
+τ00
+
+2.52 Participant
+
+2.63 Participant
+
+ICC
+
+0.21
+
+0.22
+
+N
+
+118 Participant
+
+118 Participant
+
+Observations
+
+233
+
+233
+
+Marginal R2 / Conditional R2
+
+0.153 / 0.329
+
+0.166 / 0.349
+
+\begin{verbatim}
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+## filter: removed 3 rows (1%), 235 rows remaining
+\end{verbatim}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+3.00
+
+1.91~--~4.09
+
+\textless0.001
+
+2.34
+
+0.79~--~3.89
+
+0.003
+
+expertise
+
+0.51
+
+0.34~--~0.67
+
+\textless0.001
+
+0.49
+
+0.32~--~0.67
+
+\textless0.001
+
+utterance count
+
+0.02
+
+-0.02~--~0.07
+
+0.235
+
+Random Effects
+
+σ2
+
+9.61
+
+9.36
+
+τ00
+
+2.52 Participant
+
+2.82 Participant
+
+ICC
+
+0.21
+
+0.23
+
+N
+
+118 Participant
+
+118 Participant
+
+Observations
+
+233
+
+233
+
+Marginal R2 / Conditional R2
+
+0.153 / 0.329
+
+0.158 / 0.353
+
+\begin{verbatim}
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+## filter: no rows removed
+\end{verbatim}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+4.95
+
+3.31~--~6.60
+
+\textless0.001
+
+2.91
+
+0.02~--~5.80
+
+0.048
+
+expertise
+
+0.52
+
+0.36~--~0.68
+
+\textless0.001
+
+0.90
+
+0.43~--~1.36
+
+\textless0.001
+
+comfortable PS
+
+-0.42
+
+-0.69~--~-0.15
+
+0.002
+
+0.02
+
+-0.56~--~0.59
+
+0.950
+
+expertise * comfortablePS
+
+-0.08
+
+-0.17~--~0.01
+
+0.092
+
+Random Effects
+
+σ2
+
+9.48
+
+9.26
+
+τ00
+
+2.17 Participant
+
+2.34 Participant
+
+ICC
+
+0.19
+
+0.20
+
+N
+
+118 Participant
+
+118 Participant
+
+Observations
+
+233
+
+233
+
+Marginal R2 / Conditional R2
+
+0.189 / 0.340
+
+0.199 / 0.361
+
+\includegraphics{Dissertation_NNPP_files/figure-latex/comfortableness-1.pdf}
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+3.33
+
+0.69~--~5.98
+
+0.014
+
+4.53
+
+1.56~--~7.51
+
+0.003
+
+expertise
+
+0.75
+
+0.34~--~1.17
+
+\textless0.001
+
+0.70
+
+0.28~--~1.12
+
+0.001
+
+utterance min
+
+-0.02
+
+-0.11~--~0.08
+
+0.716
+
+-0.02
+
+-0.12~--~0.07
+
+0.672
+
+expertise * utterance min
+
+-0.01
+
+-0.02~--~0.01
+
+0.270
+
+-0.01
+
+-0.02~--~0.01
+
+0.433
+
+comfortable PS
+
+-0.24
+
+-0.52~--~0.04
+
+0.094
+
+Random Effects
+
+σ2
+
+9.01
+
+8.98
+
+τ00
+
+2.14 Participant
+
+2.07 Participant
+
+ICC
+
+0.19
+
+0.19
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.205 / 0.357
+
+0.216 / 0.363
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+2.71
+
+0.92~--~4.51
+
+0.003
+
+4.42
+
+2.24~--~6.61
+
+\textless0.001
+
+expertise
+
+0.59
+
+0.30~--~0.89
+
+\textless0.001
+
+0.57
+
+0.28~--~0.86
+
+\textless0.001
+
+word min
+
+0.00
+
+-0.02~--~0.03
+
+0.819
+
+0.00
+
+-0.02~--~0.03
+
+0.846
+
+expertise * word min
+
+-0.00
+
+-0.01~--~0.00
+
+0.524
+
+-0.00
+
+-0.01~--~0.00
+
+0.734
+
+comfortable PS
+
+-0.36
+
+-0.63~--~-0.08
+
+0.010
+
+Random Effects
+
+σ2
+
+9.41
+
+9.34
+
+τ00
+
+2.28 Participant
+
+2.02 Participant
+
+ICC
+
+0.20
+
+0.18
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.165 / 0.328
+
+0.190 / 0.335
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+3.10
+
+1.79~--~4.42
+
+\textless0.001
+
+4.65
+
+2.92~--~6.38
+
+\textless0.001
+
+expertise
+
+0.51
+
+0.35~--~0.68
+
+\textless0.001
+
+0.53
+
+0.37~--~0.69
+
+\textless0.001
+
+word min
+
+-0.00
+
+-0.02~--~0.01
+
+0.583
+
+-0.00
+
+-0.01~--~0.01
+
+0.877
+
+comfortable PS
+
+-0.36
+
+-0.63~--~-0.09
+
+0.009
+
+Random Effects
+
+σ2
+
+9.46
+
+9.36
+
+τ00
+
+2.18 Participant
+
+1.94 Participant
+
+ICC
+
+0.19
+
+0.17
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.164 / 0.321
+
+0.191 / 0.330
+
+~
+
+merged performancecalcuated
+
+merged performancecalcuated
+
+Predictors
+
+Estimates
+
+CI
+
+p
+
+Estimates
+
+CI
+
+p
+
+(Intercept)
+
+4.57
+
+3.11~--~6.03
+
+\textless0.001
+
+5.49
+
+3.74~--~7.24
+
+\textless0.001
+
+expertise
+
+0.54
+
+0.38~--~0.70
+
+\textless0.001
+
+0.55
+
+0.38~--~0.71
+
+\textless0.001
+
+utterance min
+
+-0.07
+
+-0.11~--~-0.03
+
+0.001
+
+-0.05
+
+-0.10~--~-0.01
+
+0.012
+
+comfortable PS
+
+-0.26
+
+-0.54~--~0.02
+
+0.064
+
+Random Effects
+
+σ2
+
+9.09
+
+9.03
+
+τ00
+
+2.05 Participant
+
+1.98 Participant
+
+ICC
+
+0.18
+
+0.18
+
+N
+
+117 Participant
+
+117 Participant
+
+Observations
+
+230
+
+230
+
+Marginal R2 / Conditional R2
+
+0.201 / 0.348
+
+0.214 / 0.356
+
+\end{document}
