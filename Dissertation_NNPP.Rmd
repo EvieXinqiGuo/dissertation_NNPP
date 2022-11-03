@@ -69,7 +69,6 @@ processing_word_utterance_count = raw_word_utterance_count %>%
   mutate_if(is.character, gsub, pattern =" ", replace = "") %>% 
   mutate_if(is.character, gsub, pattern =".csv", replace = "") %>%
   mutate_if(is.character, gsub, pattern ="-", replace = "")
-
  
   word_count = pivot_longer(processing_word_utterance_count %>% select(L, wordCountTrial3, wordCountTrial4), cols = c("wordCountTrial3", "wordCountTrial4"), names_to ="trial", values_to = "word_count") %>%
     mutate(trial = dplyr::recode(trial, 
@@ -565,6 +564,9 @@ all_content_full_long = all_content_full_df %>%
   pivot_longer(cols = c("ambiguous_pcg", "naming_pcg", "reaction_pcg", "recall_pcg", "recognition_pcg", "negativeaffect_pcg", "positiveaffect_pcg", "location_pcg","multipurpose_pcg", "strategy_pcg", "uninformative_pcg", "loop_pcg", "describing_pcg","irrelevant_pcg"), names_to = "content", values_to = "percentage") 
 
 scaled_df = all_content_full_df %>%
+  select(word_count:TakeItSerious_Survey_1,
+         SSS_self:Content_criticize,
+         all_content:irrelevant_rate) %>% 
   scale() %>%
   data.frame()
 
@@ -579,13 +581,14 @@ unpopular_yes = recoded_full_df %>% mutate(reaction_yes = ifelse(reaction > 0, "
          uninformative_yes = ifelse(uninformativeattention > 0, "1", "0"),
          loop_yes = ifelse(loop >0, "1", "0"),
          describing_yes = ifelse(describing >0, "1", "0"), 
-         ambiguous_yes = ifelse(ambiguousunclear >0, "1", "0"))
+         ambiguous_yes = ifelse(ambiguousunclear >0, "1", "0")) %>%
+  select(reaction_yes : ambiguous_yes)
 
 scaled_df = cbind(scaled_df,unpopular_yes)
 
 
 scaled_full_df = cbind(recoded_full_df %>%
-  select(Participant, trial, TakeItSerious_Game_1:SSS_family, language), scaled_df) 
+  select(Participant, trial, Age:`TRANSFER STUDENT`, language), scaled_df) 
 
 write_csv(scaled_full_df, "/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/scaled_full_df.csv")
 
@@ -655,12 +658,20 @@ tab_model(full_model_word_min_ratio,lesion_word_min_ratio, p.val = "kr" )
 plot_model(full_model_word_min_diff, type = "pred", terms = c("word_min", "baseline_difference"))
 
 full_model_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_min + (1|Participant))
+
+
 lesion_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio+ utterance_min + (1|Participant))
 
 plot_model(full_model_utterance_min_ratio, type = "pred", terms = c("utterance_min", "baseline_ratio"), title = "Performance as a function of\nprivate speech usage and baseline", axis.title = c("Standardized utterances per minute", "Standardized Performanace Ratio"), colors = c("#FFBF00","#808080","#0A7029")) + theme_classic() + aes(linetype= group)
 
+# random slope attempt and the error message
+#  full_model_utterance_min_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_min + (1 + utterance_min|Participant))
+# Error: number of observations (=230) <= number of random effects (=234) for term (1 + utterance_min | Participant); the random-effects parameters and the residual variance (or scale parameter) are probably unidentifiable
+
 #### the graph with baseline regressed out
 plot_model(full_model_utterance_min_ratio, type = "pred", terms = c("utterance_min"), title = "Marginal effect of private speech usage on performance\n- baseline regressed out", axis.title = c("Standardized utterances per minute", "Standardized Performanace Ratio")) + theme_classic()
+
+
 
 full_model_utterance_count_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_count + (1|Participant))
 lesion_utterance_count_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio+ utterance_count + (1|Participant))
@@ -734,6 +745,19 @@ no_utterance = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count)), p
 lesion_utterance = lmer(data = scaled_full_df %>% filter(!is.na(utterance_count)), performance_difference ~ baseline_difference + utterance_count + (1|Participant))
 
 tab_model(no_utterance, lesion_utterance, p.val = "kr")
+
+# checking for R2
+full_model_word_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_count + (1|Participant))
+full_model_utterance_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_count + (1|Participant))
+
+full_model_utterance_rate_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * utterance_min + (1|Participant))
+
+full_model_word_rate_ratio = lmer(data = scaled_full_df, performance_ratio ~ baseline_ratio * word_min + (1|Participant))
+
+tab_model(full_model_utterance_ratio, 
+          full_model_word_ratio, 
+          full_model_utterance_rate_ratio, 
+          full_model_word_rate_ratio)
 ```
 
 ```{r comfortableness, echo=FALSE}
