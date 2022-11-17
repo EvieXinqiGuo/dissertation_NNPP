@@ -27,12 +27,11 @@ library(DataExplorer)
 library(SmartEDA)  
 library(tableone)
 library(rmcorr)
-library(DataExplorer)
 ```
 
 ```{r load datasets, include = FALSE}
 raw_performance = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/performance.csv")
-
+   
 raw_word_utterance_count = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/wordUtteranceCountEveryone.csv")
 
 raw_time = read_csv("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data/NNPP_merged_data/experiment_spreadsheet.csv")
@@ -105,6 +104,14 @@ processing_time = raw_time %>%
   mutate_at(vars(-Participant), number_60_division) %>%
   pivot_longer(cols = c("Time1", "Time2", "Time3", "Time4"), names_to = "trial", values_to = "time") %>%
   mutate(trial = dplyr::recode(trial, "Time1" = "1", "Time2" = "2", "Time3" = "3", "Time4" = "4"))
+
+processing_tap = raw_time %>%
+  select(Participant, Tap1, Tap2, Tap3, Tap4) %>%
+  mutate_if(is.character, tolower) %>%
+  mutate_if(is.character, gsub, pattern = " ", replace = "") %>%
+  pivot_longer(cols = c("Tap1", "Tap2", "Tap3", "Tap4"), names_to = "trial", values_to = "tap") %>%
+  mutate(trial = dplyr::recode(trial, "Tap1" = "1", "Tap2" = "2", "Tap3" = "3", "Tap4" = "4"))
+
 
 performance_baseline_talk =  full_join(processing_word_utterance_long, performance_baseline, by = c("trial", "L"))
 
@@ -476,34 +483,50 @@ recoded_full_df$Content_criticize = as.numeric(recoded_full_df$Content_criticize
 recoded_full_df$Content_naming = as.numeric(recoded_full_df$Content_naming)
 recoded_full_df$Content_prasing = as.numeric(recoded_full_df$Content_prasing)
 
-tableOne <- CreateTableOne(vars = colnames(recoded_full_df), 
+tableOne <- CreateTableOne(vars = c("word_count","utterance_count", "performance_ratio", "time", "word_min", "utterance_min", "TakeItSerious_Game_1", "TakeItSerious_Survey_1", "PS_Lkrt_rati", "PS_Lkt_conf", "PS_pcg_rati", "PS_talk_pcg_conf", "comfortable_PS", "Content_naming", "Content_prasing","Content_criticize", "Gender")
+                                                                                                 , 
                            strata = c("Gender"), 
-                           data = recoded_full_df %>% filter(!Gender == "Non-binary"))
-  #                                         Stratified by Gender
-  #                                          Man           Women         p      test
-  # n                                           54           158                    
-  # word_count (mean (SD))                   62.81 (47.04) 58.34 (41.72)  0.513     
-  # utterance_count (mean (SD))              30.56 (10.63) 27.90 (12.36)  0.160     
-  # baseline (mean (SD))                     6.35 (2.65)   5.44 (2.94)   0.044     
-  # performance_difference (mean (SD))  5.89 (3.98)   5.90 (3.68)   0.982     
-  # time (mean (SD))                         62.56 (18.31) 70.88 (29.65)  0.054     
-  # word_min (mean (SD))                     57.88 (31.50) 52.96 (37.10)  0.386     
-  # utterance_min (mean (SD))                30.70 (11.59) 25.87 (11.32)  0.008     
-  # TakeItSerious_Game_1 (mean (SD))          3.85 (0.36)   3.82 (0.44)   0.664     
-  # TakeItSerious_Survey_1 (mean (SD))        3.96 (0.19)   3.96 (0.19)   0.975     
-  # PS_Lkrt_rati (mean (SD))                  5.59 (1.12)   5.32 (1.36)   0.190     
-  # PS_Lkt_conf (mean (SD))                   6.33 (0.97)   6.18 (1.02)   0.327     
-  # PS_pcg_rati (mean (SD))                  76.63 (19.08) 75.18 (22.69)  0.674     
-  # PS_talk_pcg_conf (mean (SD))              6.07 (1.04)   6.05 (0.94)   0.878     
-  # comfortable_PS (mean (SD))                5.50 (1.60)   4.74 (1.76)   0.006     
-  # Content_naming (mean (SD))                6.46 (1.06)   6.11 (1.38)   0.088     
-  # Content_prasing (mean (SD))               1.77 (1.10)   2.56 (1.86)   0.028     
-  # Content_criticize (mean (SD))             2.00 (1.51)   2.03 (1.26)   0.916
+                           data = recoded_full_df %>% filter(Gender != "Non-binary" & Gender != "Prefer not to say" ) %>% select(word_count,utterance_count, performance_ratio, time, word_min, utterance_min, TakeItSerious_Game_1, TakeItSerious_Survey_1, PS_Lkrt_rati, PS_Lkt_conf, PS_pcg_rati, PS_talk_pcg_conf, comfortable_PS, Content_naming, Content_prasing,Content_criticize, Gender  ) %>%
+                             data.frame())
 
-print(
-  tableOne,
-  nonnormal = c("word_count","word_min", "utterance_count", "baseline_difference", "time", "performance_difference"),
-  showAllLevels = TRUE)
+df_baseline_comparison = recoded_full_df %>% select(Participant, baseline_ratio, Gender) %>%
+  distinct()
+  #                                   Stratified by Gender
+  #                                    Man           Women          p      test
+  # n                                     62           168                     
+  # word_count (mean (SD))             65.32 (49.43) 58.08 (40.90)   0.264     
+  # utterance_count (mean (SD))        31.27 (10.82) 28.16 (12.18)   0.078     
+  # performance_ratio (mean (SD))       1.31 (0.20)   1.31 (0.19)    0.904     
+  # time (mean (SD))                   64.06 (19.13) 70.96 (29.07)   0.085     
+  # word_min (mean (SD))               58.57 (31.50) 52.45 (36.39)   0.245     
+  # utterance_min (mean (SD))          30.71 (11.32) 26.00 (11.06)   0.005     
+  # TakeItSerious_Game_1 (mean (SD))    3.84 (0.37)   3.80 (0.46)    0.527     
+  # TakeItSerious_Survey_1 (mean (SD))  3.97 (0.18)   3.96 (0.19)    0.900     
+  # PS_Lkrt_rati (mean (SD))            5.48 (1.30)   5.32 (1.35)    0.399     
+  # PS_Lkt_conf (mean (SD))             6.32 (0.94)   6.15 (1.03)    0.246     
+  # PS_pcg_rati (mean (SD))            74.55 (21.78) 75.08 (22.38)   0.873     
+  # PS_talk_pcg_conf (mean (SD))        6.06 (1.04)   6.03 (0.94)    0.810     
+  # comfortable_PS (mean (SD))          5.37 (1.72)   4.74 (1.76)    0.015     
+  # Content_naming (mean (SD))          6.35 (1.29)   6.13 (1.36)    0.255     
+  # Content_prasing (mean (SD))         1.84 (1.21)   2.54 (1.82)    0.029     
+  # Content_criticize (mean (SD))       1.95 (1.49)   2.02 (1.24)    0.774     
+  # Gender = Women (%)                     0 (0.0)     168 (100.0)  <0.001 
+
+t.test(df_baseline_comparison$baseline_ratio[df_baseline_comparison$Gender == "Women"], df_baseline_comparison$baseline_ratio[df_baseline_comparison$Gender == "Man"])
+# 	Welch Two Sample t-test
+# 
+# data:  df_baseline_comparison$baseline_ratio[df_baseline_comparison$Gender == "Women"] and df_baseline_comparison$baseline_ratio[df_baseline_comparison$Gender == "Man"]
+# t = -2.1699, df = 53.847, p-value = 0.03444
+# alternative hypothesis: true difference in means is not equal to 0
+# 95 percent confidence interval:
+#  -0.134136266 -0.005298791
+# sample estimates:
+# mean of x mean of y 
+#  1.283123  1.352840 
+
+sd(df_baseline_comparison$baseline_ratio[df_baseline_comparison$Gender == "Women"], na.rm = T)
+sd(df_baseline_comparison$baseline_ratio[df_baseline_comparison$Gender == "Man"])
+
 
 setwd("/Users/guoxinqieve/Library/CloudStorage/OneDrive-UCSanDiego/Dissertation/NNPP (NO manipulation)/NNPP_data")
 recoded_full_df %>%
@@ -1302,4 +1325,52 @@ ann_text <- data.frame(good_bad = factor("bad", levels = c("bad", "good")),talke
   rbind(data.frame(good_bad = factor("good", levels = c("bad", "good")),talker_or_not = "non_talker",lab = "t(30) = -3.518, p = 0.001")) %>%
   rbind(data.frame(good_bad = factor("bad", levels = c("bad", "good")),talker_or_not = "talker",lab = "t(36) = 3.406, p = 0.002")) %>%
    rbind(data.frame(good_bad = factor("good", levels = c("bad", "good")),talker_or_not = "talker",lab = "t(27) = -2.089, p = 0.046")) 
+```
+
+```{r tap versus actual performance, include=FALSE}
+names(processing_performance)[names(processing_performance) == "L"] = "Participant"
+processing_performance$trial = as.character(processing_performance$trial)
+
+df_tap_performance = right_join(processing_tap, processing_performance, by= c("Participant", "trial")) 
+
+correlation_zeroOrder_plot = function(df, original_col_list, renamed_col_list) {
+    # corr.matrix -- correlation table and heatmap
+    corelation_matrix = as.data.frame(df[, original_col_list])
+
+    # corelation_matrix[is.na(corelation_matrix)] <- 0
+    colnames(corelation_matrix) = renamed_col_list
+
+    corelation_matrix_cor <- round(cor(corelation_matrix, use = "pairwise.complete.obs"),
+        3)
+    res1 <- cor.mtest(corelation_matrix_cor, conf.level = 0.95)
+
+    corrplot(corelation_matrix_cor, p.mat = res1$p, method = "color", type = "upper",
+        sig.level = c(0.001, 0.01, 0.05), pch.cex = 0.9, tl.cex = 0.5,
+        insig = "label_sig", pch.col = "white")
+
+    # corelation_matrix_plot =
+    # corrplot::corrplot.mixed(corelation_matrix_cor,lower.col =
+    # 'black', number.cex = .7,p.mat = res1$p, upper = 'color',
+    # sig.level = c(.001, .01, .05), pch.cex = .9, tl.cex = 0.5,
+    # insig = 'label_sig', pch.col = 'white')
+}
+
+original_col_list = c("tap", "actual_turn", "performance_ratio", "turn_assume_perfect") 
+renamed_col_list= c("raw tap", "calculated turn", "ratio", "calcualted perfect")
+
+
+correlation_zeroOrder_plot(df_tap_performance, original_col_list,renamed_col_list)
+
+cor.test(df_tap_performance$tap, df_tap_performance$actual_turn)
+
+cor.test(df_tap_performance$tap, df_tap_performance$performance_ratio)
+
+getwd()
+
+```
+
+```{r distribution of PS usage to see if ppl followed rules, include=FALSE}
+# processing_word_utterance_long is the dataset 
+ggplot(data = processing_word_utterance_long, aes(x = word_count)) +
+  geom_histogram()
 ```
